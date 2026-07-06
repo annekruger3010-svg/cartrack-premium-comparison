@@ -17,10 +17,12 @@
 
 <style>
   :root { --maxw: 1120px; --font-head: "Saira", system-ui, sans-serif;
-    --font-body: "IBM Plex Sans", system-ui, sans-serif; --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
+    --font-body: "IBM Plex Sans", system-ui, sans-serif; --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    /* professional refresh: pure-white canvas, softer hairlines (override design-system tokens) */
+    --color-canvas: #FFFFFF; --hairline: #E7EAEF; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  body { background: var(--color-canvas, #F4F6F8); color: var(--color-text, #14161B);
+  body { background: var(--color-canvas, #FFFFFF); color: var(--color-text, #14161B);
     font-family: var(--font-body); font-size: 14px; line-height: 1.5; -webkit-text-size-adjust: 100%; }
   h1, h2, h3, .head { font-family: var(--font-head); }
   .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -63,12 +65,13 @@
   h1 { font-size: 30px; font-weight: 800; margin: 6px 0 10px; }
   .lede { color: var(--color-text-muted, #5E6675); max-width: 680px; margin: 0 0 24px; }
 
-  .card { background: var(--color-surface, #fff); border: 1px solid var(--color-border, #CDD2DB);
-    border-radius: 12px; }
+  .card { background: var(--color-surface, #fff); border: 1px solid var(--hairline, #E7EAEF);
+    border-radius: 12px; box-shadow: 0 1px 2px rgba(11,12,15,.05), 0 2px 8px rgba(11,12,15,.04); }
   .card + .card { margin-top: 20px; }
   .card-h { display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: 14px 18px; border-bottom: 1px solid var(--color-divider, #DFE3E9); flex-wrap: wrap; }
-  .card-h h2 { font-size: 14px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .card-h h2 { font-size: 14px; font-weight: 800; letter-spacing: .01em; margin: 0; display: flex; align-items: center; gap: 8px; color: var(--color-text, #0B0C0F); }
+  .card-h h2::before { content: ""; width: 14px; height: 2px; background: var(--color-accent, #F47735); border-radius: 2px; flex: none; }
   .card-h .n { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-subtle,#7C8492); }
   .card-b { padding: 18px; }
   .muted { color: var(--color-text-muted, #5E6675); }
