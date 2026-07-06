@@ -320,6 +320,9 @@ const COMMON_SECTIONS = ['Buildings Combined','Business All Risks','Accidental D
   'Geyser Replacement','Fidelity Guarantee','SASRIA','Broker & assist fees'];
 
 const STORE_KEY = 'ct-compare-v1';
+// Where the RM System lives. A won comparison is handed off to the book via
+// <RM_SYSTEM_URL>#import=<base64url payload> — kept decoupled (no DB creds here).
+const RM_SYSTEM_URL = 'https://annekruger3010-svg.github.io/cartrack-rm-system/';
 const blank = () => ({
   rmId: 'hein', step: 'upload',
   client: { name: '', type: 'Portfolio — multiple buildings', renewal: '' },
@@ -430,6 +433,33 @@ function portfolio() {
     const t = quoteTotals(q); cur += t.cur; prop += t.prop; n++;
   }
   return { cur: +cur.toFixed(2), prop: +prop.toFixed(2), delta: +(prop-cur).toFixed(2), n };
+}
+
+/* ---------- won-quote → RM book handoff ---------- */
+// UTF-8-safe base64url so the payload survives a URL hash.
+function b64urlEncode(obj) {
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+// Build a won-quote payload and open the RM System to add it to the book.
+function sendToBook() {
+  const quoted = state.buildings.filter(b => { const q = selQuote(b); return q && q.lines.length; });
+  if (!quoted.length) { alert('Add at least one quote before sending to the book.'); return; }
+  const client = (state.client.name || '').trim();
+  if (!client) { alert('Enter the client name (Step 1) before sending to the book.'); return; }
+  const p = portfolio();
+  const insurers = [...new Set(quoted.map(b => (selQuote(b).insurer || 'Cartrack').trim()).filter(Boolean))];
+  const payload = {
+    v: 1, src: 'premium-comparison',
+    rm: state.rmId,                    // matches the RM System rm_slug
+    client,
+    insurer: insurers.join(' / '),
+    premiumMonthly: p.prop,            // total proposed monthly premium
+    buildings: quoted.length,
+    renewal: state.client.renewal || '',
+    ts: Date.now(),
+  };
+  window.open(RM_SYSTEM_URL + '#import=' + b64urlEncode(payload), '_blank', 'noopener');
 }
 
 /* ---------- Local extraction ---------- */
@@ -1222,6 +1252,7 @@ function screenReport() {
     el('div', { class: 'bar no-print' }, el('div', { class: 'bar-in' },
       el('button', { class: 'btn', onClick: () => go('review') }, '← Review'),
       el('div', { style: 'flex:1' }),
+      el('button', { class: 'btn', onClick: sendToBook }, 'Send to RM book →'),
       el('button', { class: 'btn primary', onClick: () => window.print() }, 'Print / save as PDF'),
     )),
   );
