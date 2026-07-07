@@ -416,13 +416,23 @@ const COMMON_SECTIONS = ['Buildings Combined','Business All Risks','Accidental D
   'Electronic Equipment','Glass','Public Liability','Commercial Umbrella Liability','Money',
   'Geyser Replacement','Fidelity Guarantee','SASRIA','Broker & assist fees'];
 
+// Client categories. "Large Vehicle Fleets" routes the reader to fleet mode;
+// every other category reads as commercial property (line-by-line cover).
+const CLIENT_TYPES = [
+  { name: 'Commercial Property', desc: 'Commercial real estate, corporate buildings, and infrastructure.' },
+  { name: 'Large Vehicle Fleets', desc: 'Heavy commercial vehicles, transport fleets, and logistics operations.' },
+  { name: 'Asset Risk', desc: 'Heavy machinery, factory plants, warehousing, and complex physical assets.' },
+  { name: 'Engineering & Marine', desc: 'Contract works, specialized construction risk, and marine cargo.' },
+  { name: 'Specialized Liability', desc: 'Comprehensive corporate liability, professional indemnity, and business interruption.' },
+];
+
 const STORE_KEY = 'ct-compare-v1';
 // Where the RM System lives. A won comparison is handed off to the book via
 // <RM_SYSTEM_URL>#import=<base64url payload> — kept decoupled (no DB creds here).
 const RM_SYSTEM_URL = 'https://cartrack-commercial.github.io/cartrack-rm-system/';
 const blank = () => ({
   rmId: null, rmChosen: false, step: 'upload',
-  client: { name: '', type: 'Portfolio — multiple buildings', renewal: '' },
+  client: { name: '', type: 'Commercial Property', renewal: '' },
   options: [{ id: uid(), insurer: '' }], // Cartrack proposal options (insurers) shown to the client
   files: { schedule: [], quote: [] }, // {id,name,size,kind,status,text,chars,error,optionId}
   seeded: false,
@@ -970,31 +980,31 @@ function parseFleetCurTotal(text) {
   return cands.length ? Math.max(...cands) : null;
 }
 function fleetSeed() {
-  const qFiles = state.files.quote.filter(f => f.status === 'ok');
-  const fleetFiles = qFiles.filter(f => looksLikeFleet(f.text));
-  if (!fleetFiles.length) return false;
-  // Only hijack the property flow if we can genuinely parse a fleet structure
-  // (real fleet items + a reconciling total) from a proposal.
-  if (!fleetFiles.some(f => { const p = parseFleetSections(f.text); return p.secs.length >= 1 && p.grand > 0; })) return false;
+  // The client type is the router: fleet reader runs ONLY when the RM selected
+  // "Large Vehicle Fleets". Everything else reads as commercial property — so a
+  // property portfolio can never be mis-read as a fleet again.
+  if (!/vehicle fleet/i.test(state.client.type || '')) return false;
   if (state.buildings.some(b => b.__fleet)) return true; // already fleet-seeded
   const client = (state.client.name || '').trim();
   if (!state.buildings.length) state.buildings.push(newBuilding(client ? (client + ' — vehicle fleet') : 'Vehicle fleet'));
   const bld = state.buildings[0]; bld.__fleet = true;
   let curTotal = null;
   for (const f of state.files.schedule) { if (f.status !== 'ok') continue; const c = parseFleetCurTotal(f.text); if (c) curTotal = Math.max(curTotal || 0, c); }
+  const qFiles = state.files.quote.filter(f => f.status === 'ok');
   const multiOpt = (state.options || []).length > 1;
-  qFiles.forEach(f => {
-    const opt = (state.options || []).find(o => o.id === f.optionId);
-    const insurer = (multiOpt && opt && opt.insurer.trim()) ? opt.insurer.trim() : proposedInsurer(f.text, f.name);
-    const parsed = parseFleetSections(f.text);
-    const q = newQuote(bld.id, insurer, guessQuoteNo(f.text, f.name));
-    q.optionId = f.optionId || (state.options[0] && state.options[0].id);
-    q.srcId = f.id;
+  (qFiles.length ? qFiles : [null]).forEach(f => {
+    const opt = f ? (state.options || []).find(o => o.id === f.optionId) : null;
+    const insurer = (multiOpt && opt && opt.insurer.trim()) ? opt.insurer.trim() : (f ? proposedInsurer(f.text, f.name) : 'Cartrack');
+    const parsed = f ? parseFleetSections(f.text) : { secs: [] };
+    const q = newQuote(bld.id, insurer, f ? guessQuoteNo(f.text, f.name) : '');
+    q.optionId = (f && f.optionId) || (state.options[0] && state.options[0].id);
+    if (f) q.srcId = f.id;
     q.lines = [];
     // Always give the RM a clear place for the client's current premium (pre-filled
     // if the schedule stated it; blank for them to type otherwise).
     q.lines.push({ id: uid(), s: 'Current fleet premium (as billed)', curL: '', cur: curTotal, propL: '', prop: null, propNq: true, curStr: '', propStr: 'n/a' });
-    parsed.secs.forEach(s => q.lines.push({ id: uid(), s: s.s, curL: '', cur: null, propL: '', prop: s.prop, curStr: '', propStr: '' }));
+    const secs = parsed.secs.length ? parsed.secs : [{ s: 'Motor & vehicle cover', prop: null }];
+    secs.forEach(s => q.lines.push({ id: uid(), s: s.s, curL: '', cur: null, propL: '', prop: s.prop, curStr: '', propStr: '' }));
     state.quotes.push(q);
   });
   state.seeded = true; save();
@@ -1200,16 +1210,22 @@ function screenUpload() {
     el('p', { class: 'lede' }, "Attach the client's current policy schedules and the Cartrack proposed quotes. Files are read on this device — nothing is uploaded to a server. You can also skip straight to Review and enter everything by hand."),
     el('div', { class: 'card' },
       el('div', { class: 'card-h' }, el('h2', {}, 'Client details')),
-      el('div', { class: 'card-b' }, el('div', { class: 'grid3' },
-        el('label', { class: 'field' }, el('div', { class: 'lab' }, 'Client / group name'),
-          el('input', { value: c.name, placeholder: 'Client or group name', onInput: bind('name') })),
-        el('label', { class: 'field' }, el('div', { class: 'lab' }, 'Client type'),
-          (() => { const s = el('select', { class: 'inp', onChange: bind('type') });
-            ['Portfolio — multiple buildings', 'Single building', 'Commercial — other']
-              .forEach(o => s.append(el('option', { value: o, selected: o === c.type }, o))); return s; })()),
-        el('label', { class: 'field' }, el('div', { class: 'lab' }, 'Renewal date'),
-          el('input', { type: 'date', value: c.renewal, onInput: bind('renewal') })),
-      )),
+      el('div', { class: 'card-b' },
+        el('div', { class: 'grid3' },
+          el('label', { class: 'field' }, el('div', { class: 'lab' }, 'Client / group name'),
+            el('input', { value: c.name, placeholder: 'Client or group name', onInput: bind('name') })),
+          el('label', { class: 'field' }, el('div', { class: 'lab' }, 'Client type'),
+            (() => { const s = el('select', { class: 'inp' });
+              CLIENT_TYPES.forEach(t => s.append(el('option', { value: t.name, selected: t.name === c.type }, t.name)));
+              s.onchange = () => { c.type = s.value; state.seeded = false; save(); render(); };
+              return s; })()),
+          el('label', { class: 'field' }, el('div', { class: 'lab' }, 'Renewal date'),
+            el('input', { type: 'date', value: c.renewal, onInput: bind('renewal') }))),
+        (() => { const t = CLIENT_TYPES.find(x => x.name === c.type);
+          return t ? el('div', { class: 'note', style: 'margin-top:12px' }, el('span', { class: 'dot' }, '•'),
+            el('span', {}, el('b', {}, t.name + ' — '), t.desc
+              + (/vehicle fleet/i.test(t.name) ? '  The reader will read fleet premiums (vehicles, SASRIA, fees).' : '  Read line-by-line as commercial property cover.'))) : null; })(),
+      ),
     ),
     el('div', { class: 'panels', style: 'margin-top:20px' },
       panel('Current policy schedules', '01', 'schedule', '.pdf,.xlsx,.xls,application/pdf', 'Drop schedules here — one per building, or a workbook'),
