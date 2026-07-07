@@ -904,7 +904,73 @@ function newBuilding(name) { return { id: uid(), name: name || 'Building ' + (st
 function newQuote(buildingId, insurer='', quoteNo='') {
   return { id: uid(), buildingId, insurer, quoteNo, note: '', advisories: '', lines: [] };
 }
+/* ---------- Fleet / motor policies (vehicles, not buildings) ---------- */
+// A motor-fleet quote/schedule has vehicles, fleet values and motor premiums —
+// none of the property cover sections the normal parser looks for. Detect it and
+// read the premium totals instead.
+function looksLikeFleet(text) {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  let hits = 0;
+  [/\bfleet\b/, /number of vehicles/, /total fleet value/, /comprehensive/, /\bmotor\b/, /\bvehicle/, /sasria premium calculation/].forEach(re => { if (re.test(t)) hits++; });
+  return hits >= 3;
+}
+const _fnum = s => parseFloat(String(s).replace(/[R\s,]/g, '')) || 0;
+// Parse a proposed fleet quote into comparison sections (per-fleet + SASRIA + fees),
+// with a balancing line so the sections always reconcile to the stated grand total.
+function parseFleetSections(text) {
+  const first = re => { const m = re.exec(text); return m ? _fnum(m[1]) : null; };
+  const fleets = [];
+  const re = /Item\s+(\d+)\s*[-–]\s*([A-Za-z][A-Za-z0-9 ]*?)\s+(\d+)\s+Sum Insured\s*R([\d ,]+)[\s\S]{0,180}?Total Premium\s*R([\d ,]+\.\d{2})/g;
+  let m; while ((m = re.exec(text))) fleets.push({ name: m[2].trim(), count: +m[3], prem: _fnum(m[5]) });
+  const cover = first(/Cover Sub-?Total\s*R([\d ,]+\.\d{2})/i);
+  const sasria = first(/Sasria Sub-?Total\s*R([\d ,]+\.\d{2})/i);
+  const fees = first(/(?:Broker Fee|Fee Sub-?Total)\s*R([\d ,]+\.\d{2})/i);
+  const grand = first(/Cover Sub-?Total\s*R[\d ,]+\.\d{2}\s*Premium\s*R([\d ,]+\.\d{2})/i);
+  const sumF = fleets.reduce((s, f) => s + f.prem, 0);
+  const secs = fleets.map(f => ({ s: f.name + ' (' + f.count + ' vehicles)', prop: +f.prem }));
+  if (cover && cover - sumF > 1) secs.push({ s: 'Other vehicle cover', prop: +(cover - sumF).toFixed(2) });
+  if (sasria) secs.push({ s: 'SASRIA', prop: sasria });
+  if (fees) secs.push({ s: 'Broker / admin fee', prop: fees });
+  if (!secs.length && grand) secs.push({ s: 'Motor & vehicle cover', prop: grand });
+  return { secs, grand: grand || (sumF + (sasria || 0) + (fees || 0)) };
+}
+// Best-effort single current premium off a (possibly OCR'd) schedule.
+function parseFleetCurTotal(text) {
+  const cands = [...(text || '').matchAll(/(?:total premium|monthly premium|premium payable|total monthly|premium due)[^R\d]{0,14}R?\s?([\d][\d ,]{2,}\.\d{2})/gi)]
+    .map(m => _fnum(m[1])).filter(v => v > 100);
+  return cands.length ? Math.max(...cands) : null;
+}
+function fleetSeed() {
+  const qFiles = state.files.quote.filter(f => f.status === 'ok');
+  if (!qFiles.length || !qFiles.some(f => looksLikeFleet(f.text))) return false;
+  if (state.buildings.some(b => b.__fleet)) return true; // already fleet-seeded
+  const client = (state.client.name || '').trim();
+  if (!state.buildings.length) state.buildings.push(newBuilding(client ? (client + ' — vehicle fleet') : 'Vehicle fleet'));
+  const bld = state.buildings[0]; bld.__fleet = true;
+  let curTotal = null;
+  for (const f of state.files.schedule) { if (f.status !== 'ok') continue; const c = parseFleetCurTotal(f.text); if (c) curTotal = Math.max(curTotal || 0, c); }
+  const multiOpt = (state.options || []).length > 1;
+  qFiles.forEach(f => {
+    const opt = (state.options || []).find(o => o.id === f.optionId);
+    const insurer = (multiOpt && opt && opt.insurer.trim()) ? opt.insurer.trim() : proposedInsurer(f.text, f.name);
+    const parsed = parseFleetSections(f.text);
+    const q = newQuote(bld.id, insurer, guessQuoteNo(f.text, f.name));
+    q.optionId = f.optionId || (state.options[0] && state.options[0].id);
+    q.srcId = f.id;
+    q.lines = [];
+    // Always give the RM a clear place for the client's current premium (pre-filled
+    // if the schedule stated it; blank for them to type otherwise).
+    q.lines.push({ id: uid(), s: 'Current fleet premium (as billed)', curL: '', cur: curTotal, propL: '', prop: null, propNq: true, curStr: '', propStr: 'n/a' });
+    parsed.secs.forEach(s => q.lines.push({ id: uid(), s: s.s, curL: '', cur: null, propL: '', prop: s.prop, curStr: '', propStr: '' }));
+    state.quotes.push(q);
+  });
+  state.seeded = true; save();
+  return true;
+}
+
 function seedFromFiles() {
+  if (fleetSeed()) return; // motor-fleet policies use a separate reader
   // Buildings: one per XLSX sheet, or one per distinct schedule-PDF building
   // name (two schedules for the same building — e.g. Bryte + AIG — dedupe).
   if (!state.buildings.length) {
