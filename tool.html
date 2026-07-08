@@ -983,6 +983,21 @@ function fleetTotalPremium(text) {
   }
   return cands.length ? Math.max(...cands) : null;
 }
+// Is the premium stated per year? Strong monthly signals win; then look for
+// explicit annual wording. Default monthly (most SA short-term fleet is monthly).
+function premiumIsAnnual(text) {
+  const t = (text || '').toLowerCase();
+  if (/monthly premium|premium[^.]{0,4}per month|\bper month\b|\bp\/m\b|type of contract\s*:?\s*monthly|payment (?:method|frequency)\s*:?\s*monthly|debit order/.test(t)) return false;
+  return /annual premium|premium[^.]{0,6}per annum|\bper annum\b|\bp\.?a\.?\b|premium per year|yearly premium|annual total premium/.test(t);
+}
+// SASRIA premium (not an extension limit): the amount right after "sasria",
+// accepted only if it's a small slice of the total (SASRIA is always small).
+function fleetSasria(text, total) {
+  const m = /sasria\b[^\d%]{0,18}?(?:R\s*)?(\d[\d \.,]*\d)\s*R?/i.exec(text || '');
+  if (!m) return null;
+  const v = parseMoney2(m[1]);
+  return (v && total && v > 5 && v < total * 0.25) ? v : null;
+}
 // Parse a proposed fleet quote into comparison sections. Detailed per-fleet
 // breakdown for the FleetBüddy layout; a generic total-premium line otherwise.
 function parseFleetSections(text) {
@@ -1000,8 +1015,16 @@ function parseFleetSections(text) {
   if (sasria) secs.push({ s: 'SASRIA', prop: sasria });
   if (fees) secs.push({ s: 'Broker / admin fee', prop: fees });
   if (!secs.length && grand) secs.push({ s: 'Motor & vehicle cover', prop: grand });
-  // Fallback for any other insurer layout: the headline total premium.
-  if (!secs.length) { const tot = fleetTotalPremium(text); if (tot) secs.push({ s: 'Total fleet premium', prop: tot }); }
+  // Fallback for any other insurer layout: the headline total premium, with
+  // SASRIA split out when it can be read cleanly.
+  if (!secs.length) {
+    const tot = fleetTotalPremium(text);
+    if (tot) {
+      const sas = fleetSasria(text, tot);
+      if (sas) { secs.push({ s: 'Motor & vehicle cover', prop: +(tot - sas).toFixed(2) }); secs.push({ s: 'SASRIA', prop: sas }); }
+      else secs.push({ s: 'Total fleet premium', prop: tot });
+    }
+  }
   return { secs, grand: grand || (sumF + (sasria || 0) + (fees || 0)) };
 }
 // Current premium off a (possibly OCR'd) schedule — robust across formats.
@@ -1015,13 +1038,21 @@ function fleetSeed() {
   const client = (state.client.name || '').trim();
   if (!state.buildings.length) state.buildings.push(newBuilding(client ? (client + ' — vehicle fleet') : 'Vehicle fleet'));
   const bld = state.buildings[0]; bld.__fleet = true;
-  let curTotal = null;
-  for (const f of state.files.schedule) { if (f.status !== 'ok') continue; const c = parseFleetCurTotal(f.text); if (c) curTotal = Math.max(curTotal || 0, c); }
+  // Normalise everything to a monthly basis so the comparison is apples-to-apples:
+  // if a quote states premiums per year, divide by 12.
+  let curTotal = null, converted = false;
+  for (const f of state.files.schedule) {
+    if (f.status !== 'ok') continue;
+    const c = parseFleetCurTotal(f.text); if (!c) continue;
+    const annual = premiumIsAnnual(f.text); const monthly = annual ? c / 12 : c;
+    if (monthly > (curTotal || 0)) { curTotal = monthly; if (annual) converted = true; }
+  }
   const qFiles = state.files.quote.filter(f => f.status === 'ok');
   const multiOpt = (state.options || []).length > 1;
   (qFiles.length ? qFiles : [null]).forEach(f => {
     const opt = f ? (state.options || []).find(o => o.id === f.optionId) : null;
     const insurer = (multiOpt && opt && opt.insurer.trim()) ? opt.insurer.trim() : (f ? proposedInsurer(f.text, f.name) : 'Cartrack');
+    const annual = f ? premiumIsAnnual(f.text) : false; if (annual) converted = true;
     const parsed = f ? parseFleetSections(f.text) : { secs: [] };
     const q = newQuote(bld.id, insurer, f ? guessQuoteNo(f.text, f.name) : '');
     q.optionId = (f && f.optionId) || (state.options[0] && state.options[0].id);
@@ -1031,7 +1062,8 @@ function fleetSeed() {
     // if the schedule stated it; blank for them to type otherwise).
     q.lines.push({ id: uid(), s: 'Current fleet premium (as billed)', curL: '', cur: curTotal, propL: '', prop: null, propNq: true, curStr: '', propStr: 'n/a' });
     const secs = parsed.secs.length ? parsed.secs : [{ s: 'Motor & vehicle cover', prop: null }];
-    secs.forEach(s => q.lines.push({ id: uid(), s: s.s, curL: '', cur: null, propL: '', prop: s.prop, curStr: '', propStr: '' }));
+    secs.forEach(s => q.lines.push({ id: uid(), s: s.s, curL: '', cur: null, propL: '', prop: (annual && s.prop != null) ? +(s.prop / 12).toFixed(2) : s.prop, curStr: '', propStr: '' }));
+    if (converted) q.advisories = 'Premiums stated per year on a quote are shown here per month (÷12). Confirm the basis of every figure before presenting.';
     state.quotes.push(q);
   });
   state.seeded = true; save();
