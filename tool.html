@@ -241,10 +241,11 @@
   .rvtable td.r { text-align: right; }
   .rvtable tr.tot td { background: var(--ink-25,#FAFBFC); font-weight: 700; padding: 8px; }
   .rvtable td.best { background: var(--orange-50,#FEF4EC); color: var(--green-700,#166B46); }
-  .rvin { width: 100%; border: 1px solid transparent; background: transparent; font: inherit; padding: 6px; border-radius: 6px; box-sizing: border-box; }
-  .rvin:hover { border-color: var(--hairline,#E7EAEF); }
-  .rvin:focus { outline: none; border-color: var(--color-accent,#F47735); background: #fff; }
+  .rvin { width: 100%; border: 1px solid var(--color-border,#CDD2DB); background: #fff; font: inherit; padding: 6px 8px; border-radius: 6px; box-sizing: border-box; }
+  .rvin:hover { border-color: var(--color-text-subtle,#7C8492); }
+  .rvin:focus { outline: none; border-color: var(--color-accent,#F47735); box-shadow: 0 0 0 2px rgba(244,119,53,.18); }
   .rvin.r { text-align: right; font-family: var(--font-mono); }
+  .rvin::placeholder { color: var(--ink-300,#A8AFBC); }
   .rvname { border: 1px solid transparent; background: transparent; font: inherit; font-weight: 800; color: inherit; padding: 2px 5px; border-radius: 6px; min-width: 130px; }
   .rvname:hover { border-color: rgba(255,255,255,.25); } .rvname:focus { outline: none; border-color: var(--color-accent,#F47735); }
   .optcards { display: grid; gap: 10px; margin: 4px 0 20px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
@@ -1069,21 +1070,31 @@ function genericSeed() {
     if (monthly > (curTotal || 0)) { curTotal = monthly; if (annual) converted = true; }
   }
   const qFiles = state.files.quote.filter(f => f.status === 'ok');
-  const multiOpt = (state.options || []).length > 1;
-  (qFiles.length ? qFiles : [null]).forEach(f => {
-    const opt = f ? (state.options || []).find(o => o.id === f.optionId) : null;
-    const insurer = (multiOpt && opt && opt.insurer.trim()) ? opt.insurer.trim() : (f ? proposedInsurer(f.text, f.name) : 'Cartrack');
-    const annual = f ? premiumIsAnnual(f.text) : false; if (annual) converted = true;
-    const parsed = f ? parseFleetSections(f.text) : { secs: [] };
-    const q = newQuote(bld.id, insurer, f ? guessQuoteNo(f.text, f.name) : '');
-    q.optionId = (f && f.optionId) || (state.options[0] && state.options[0].id);
-    if (f) q.srcId = f.id;
+  // One column per PROPOSAL (option). Files dropped under the same proposal are
+  // combined — their premiums summed into a single column.
+  const byOpt = new Map(); const defOid = (state.options[0] && state.options[0].id) || 'o1';
+  qFiles.forEach(f => { const oid = f.optionId || defOid; if (!byOpt.has(oid)) byOpt.set(oid, []); byOpt.get(oid).push(f); });
+  const optionIds = byOpt.size ? [...byOpt.keys()] : [defOid];
+  optionIds.forEach(oid => {
+    const files = byOpt.get(oid) || [];
+    const opt = (state.options || []).find(o => o.id === oid);
+    // combine sections across this proposal's files (sum by section, monthly-normalised)
+    const combined = new Map(), order = [];
+    files.forEach(f => {
+      const annual = premiumIsAnnual(f.text); if (annual) converted = true;
+      parseFleetSections(f.text).secs.forEach(s => {
+        const v = (annual && s.prop != null) ? s.prop / 12 : s.prop;
+        if (!combined.has(s.s)) { combined.set(s.s, 0); order.push(s.s); }
+        combined.set(s.s, (combined.get(s.s) || 0) + (v || 0));
+      });
+    });
+    const insurer = (opt && opt.insurer && opt.insurer.trim()) ? opt.insurer.trim() : (files[0] ? proposedInsurer(files[0].text, files[0].name) : 'Cartrack');
+    const q = newQuote(bld.id, insurer, files[0] ? guessQuoteNo(files[0].text, files[0].name) : '');
+    q.optionId = oid; if (files[0]) q.srcId = files[0].id;
     q.lines = [];
-    // Always give the RM a clear place for the client's current premium (pre-filled
-    // if the schedule stated it; blank for them to type otherwise).
     q.lines.push({ id: uid(), s: 'Current premium (as billed)', curL: '', cur: curTotal, propL: '', prop: null, propNq: true, curStr: '', propStr: 'n/a' });
-    const secs = parsed.secs.length ? parsed.secs : [{ s: 'Total premium', prop: null }];
-    secs.forEach(s => q.lines.push({ id: uid(), s: s.s, curL: '', cur: null, propL: '', prop: (annual && s.prop != null) ? +(s.prop / 12).toFixed(2) : s.prop, curStr: '', propStr: '' }));
+    const secList = order.length ? order.map(k => ({ s: k, prop: +combined.get(k).toFixed(2) })) : [{ s: 'Total premium', prop: null }];
+    secList.forEach(s => q.lines.push({ id: uid(), s: s.s, curL: '', cur: null, propL: '', prop: s.prop, curStr: '', propStr: '' }));
     if (converted) q.advisories = 'Premiums stated per year on a quote are shown here per month (÷12). Confirm the basis of every figure before presenting.';
     state.quotes.push(q);
   });
