@@ -1029,6 +1029,14 @@ function parseFleetSections(text) {
 }
 // Current premium off a (possibly OCR'd) schedule — robust across formats.
 function parseFleetCurTotal(text) { return fleetTotalPremium(text); }
+// Do the uploaded documents look like a vehicle fleet? Used only as a safety net
+// when property reading found nothing, so a mis-set client type still works.
+function looksFleetish() {
+  const t = [...state.files.schedule, ...state.files.quote].filter(f => f.status === 'ok').map(f => f.text || '').join(' ').toLowerCase();
+  let h = 0;
+  [/\bfleet\b/, /number of vehicles/, /motor schedule/, /vehicle schedule/, /private vehicles/, /heavy commercial vehicle/, /total fleet value/, /comprehensive[^.]{0,25}vehicle/, /fleetb(?:ü|u)ddy/].forEach(re => { if (re.test(t)) h++; });
+  return h >= 2;
+}
 function fleetSeed() {
   // The client type is the router: fleet reader runs ONLY when the RM selected
   // "Large Vehicle Fleets". Everything else reads as commercial property — so a
@@ -1155,6 +1163,17 @@ function seedFromFiles() {
   }
   for (const b of state.buildings) delete b.__curRows;
   for (const q of state.quotes) mergeDuplicateSections(q);  // fold equivalent sections
+  // Safety net: if property reading pulled no figures but the documents are
+  // clearly a vehicle fleet, switch to the fleet reader automatically and set
+  // the client type to match — rescues the case where the type was left wrong.
+  const gotFigures = state.quotes.some(q => (q.lines || []).some(l => l.prop != null || l.cur != null))
+    || state.buildings.some(b => b.si);
+  if (!gotFigures && looksFleetish()) {
+    state.buildings.length = 0; state.quotes.length = 0;
+    if (!/vehicle fleet/i.test(state.client.type || '')) state.client.type = 'Large Vehicle Fleets';
+    fleetSeed();
+    return;
+  }
   state.seeded = true; save();
 }
 
@@ -1452,7 +1471,7 @@ function screenReview() {
       state.buildings.map((b, i) => buildingCard(b, i))),
     el('div', { style: 'display:flex;gap:8px;margin-top:16px;flex-wrap:wrap' },
       el('button', { class: 'btn sm', onClick: () => { state.buildings.push(newBuilding()); save(); render(); } }, '+ Add building'),
-      el('button', { class: 'btn sm ghost', onClick: () => { if (confirm('Re-run pre-fill from the uploaded files? Existing buildings stay; new quotes may be added.')) { state.seeded = false; seedFromFiles(); render(); } } }, '↻ Re-seed from files'),
+      el('button', { class: 'btn sm ghost', onClick: () => { if (confirm('Re-read everything from the uploaded files? This replaces the buildings and quotes below with a fresh read.')) { state.buildings = []; state.quotes = []; state.seeded = false; seedFromFiles(); render(); } } }, '↻ Re-seed from files'),
     ),
     el('div', { class: 'bar' }, el('div', { class: 'bar-in' },
       el('button', { class: 'btn', onClick: () => go('upload') }, '← Upload'),
