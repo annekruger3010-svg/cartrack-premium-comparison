@@ -377,21 +377,26 @@
   }
   /* ============================================================
      MAGIC CLIENT REPORT — branded, auto-verdict comparison.
-     Work Sans + Source Code Pro, embedded so it renders and prints
+     Space Grotesk + Space Mono + Libre Franklin, embedded so it renders and prints
      identically anywhere. Scoped under .cr so the rest of the app
      (Saira / IBM Plex) is untouched.
      ============================================================ */
-  @font-face{font-family:'Work Sans';font-style:normal;font-weight:400;font-display:swap;src:url('assets/fonts/worksans-400.woff2') format('woff2');}
-  @font-face{font-family:'Work Sans';font-style:normal;font-weight:700;font-display:swap;src:url('assets/fonts/worksans-700.woff2') format('woff2');}
-  @font-face{font-family:'Source Code Pro';font-style:normal;font-weight:400;font-display:swap;src:url('assets/fonts/sourcecodepro-400.woff2') format('woff2');}
+  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:500;font-display:swap;src:url('assets/fonts/spacegrotesk-500.woff2') format('woff2');}
+  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:700;font-display:swap;src:url('assets/fonts/spacegrotesk-700.woff2') format('woff2');}
+  @font-face{font-family:'Space Mono';font-style:normal;font-weight:400;font-display:swap;src:url('assets/fonts/spacemono-400.woff2') format('woff2');}
+  @font-face{font-family:'Space Mono';font-style:normal;font-weight:700;font-display:swap;src:url('assets/fonts/spacemono-700.woff2') format('woff2');}
+  @font-face{font-family:'Libre Franklin';font-style:normal;font-weight:400;font-display:swap;src:url('assets/fonts/librefranklin-400.woff2') format('woff2');}
+  @font-face{font-family:'Libre Franklin';font-style:normal;font-weight:600;font-display:swap;src:url('assets/fonts/librefranklin-600.woff2') format('woff2');}
+  @font-face{font-family:'Libre Franklin';font-style:normal;font-weight:700;font-display:swap;src:url('assets/fonts/librefranklin-700.woff2') format('woff2');}
 
   .cr{ --ink:#101215; --ink-2:#39404A; --muted:#6E7681; --paper:#FBFAF8; --card:#FFFFFF;
     --line:#EAE6DF; --line-2:#F2EFEA; --panel:#14161C; --orange:#F4772E; --orange-hi:#FF9A5A;
     --orange-deep:#CE5C16; --green:#12936A; --green-bg:#E7F4EE; --red:#D8443C; --red-bg:#FBEAE8;
     --blue:#2C6BB3; --blue-bg:#E8EFF7;
-    font-family:'Work Sans','Segoe UI',system-ui,-apple-system,sans-serif; color:var(--ink);
+    font-family:'Libre Franklin','Segoe UI',system-ui,-apple-system,sans-serif; color:var(--ink);
     background:var(--paper); border-radius:14px; overflow:hidden; }
-  .cr .num{font-family:'Source Code Pro',ui-monospace,Consolas,Menlo,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+  .cr .num{font-family:'Libre Franklin',system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:0;}
+  .cr h1,.cr h2,.cr h3,.cr-hero h1,.cr-qc h3,.cr-sh h2,.cr-eyerow h2,.cr-chart .ct,.cr-alert .at{font-family:'Space Grotesk','Libre Franklin',sans-serif;letter-spacing:-.01em;}
 
   /* hero */
   .cr-hero{position:relative;background:var(--panel);color:#fff;padding:32px 34px 34px;overflow:hidden;}
@@ -401,33 +406,33 @@
   .cr-wm{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px;}
   .cr-wm .logo{font-weight:700;font-size:14px;letter-spacing:.14em;text-transform:uppercase;}
   .cr-wm .logo b{color:var(--orange-hi);}
-  .cr-wm .ref{font-family:'Source Code Pro',monospace;font-size:10px;letter-spacing:.05em;color:#8B93A0;text-align:right;line-height:1.7;}
-  .cr-eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:'Source Code Pro',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--orange-hi);margin-bottom:13px;}
+  .cr-wm .ref{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.05em;color:#8B93A0;text-align:right;line-height:1.7;}
+  .cr-eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--orange-hi);margin-bottom:13px;}
   .cr-eyebrow::before{content:"";width:24px;height:2px;background:var(--orange);}
   .cr-hero h1{font-weight:700;font-size:clamp(26px,4.4vw,40px);line-height:1.03;letter-spacing:-.02em;margin:0 0 11px;text-wrap:balance;}
   .cr-hero .lede{font-size:14px;color:#C4CAD2;max-width:60ch;line-height:1.55;}
   .cr-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;}
-  .cr-chip{font-family:'Source Code Pro',monospace;font-size:10.5px;color:#E6E9ED;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:5px 12px;}
+  .cr-chip{font-family:'Space Mono',monospace;font-size:10.5px;color:#E6E9ED;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:5px 12px;}
   .cr-chip b{color:#fff;font-weight:700;}
 
   .cr-b{padding:28px 34px 34px;}
   .cr-eyerow{display:flex;align-items:baseline;gap:12px;margin:0 0 14px;}
-  .cr-eyerow .k{font-family:'Source Code Pro',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--orange-deep);}
+  .cr-eyerow .k{font-family:'Space Mono',monospace;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--orange-deep);}
   .cr-eyerow h2{font-weight:700;font-size:14px;letter-spacing:.01em;text-transform:uppercase;}
   .cr-eyerow .line{flex:1;height:1px;background:var(--line);}
 
   /* verdict cards */
   .cr-cards{display:grid;gap:13px;margin-bottom:16px;}
   .cr-qc{position:relative;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px 18px 16px;overflow:hidden;}
-  .cr-qc .role{font-family:'Source Code Pro',monospace;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);}
+  .cr-qc .role{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);}
   .cr-qc h3{font-weight:700;font-size:19px;letter-spacing:-.01em;margin:3px 0 12px;line-height:1.1;}
-  .cr-qc .prem{font-family:'Source Code Pro',monospace;font-weight:700;font-size:26px;letter-spacing:-.02em;line-height:1;}
-  .cr-qc .per{font-family:'Source Code Pro',monospace;font-size:10.5px;color:var(--muted);margin-top:5px;}
+  .cr-qc .prem{font-family:'Space Grotesk','Libre Franklin',sans-serif;font-weight:700;font-size:26px;letter-spacing:-.02em;line-height:1;}
+  .cr-qc .per{font-family:'Space Mono',monospace;font-size:10.5px;color:var(--muted);margin-top:5px;}
   .cr-qc .delta{margin-top:11px;font-size:12.5px;font-weight:600;}
   .cr-qc .delta .save{color:var(--green);} .cr-qc .delta .base{color:var(--muted);font-weight:600;}
   .cr-qc.win{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange),0 12px 30px rgba(244,119,46,.16);}
   .cr-qc.win::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,var(--orange-hi),var(--orange-deep));}
-  .cr-badge{position:absolute;top:13px;right:13px;font-family:'Source Code Pro',monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--orange);color:#fff;padding:4px 9px;border-radius:999px;}
+  .cr-badge{position:absolute;top:13px;right:13px;font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--orange);color:#fff;padding:4px 9px;border-radius:999px;}
 
   /* savings chart */
   .cr-chart{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:19px 21px;margin-bottom:16px;}
@@ -436,12 +441,12 @@
   .cr-bar{display:grid;grid-template-columns:118px 1fr;align-items:center;gap:13px;margin-bottom:11px;}
   .cr-bar:last-child{margin-bottom:0;}
   .cr-bar .bl{font-weight:600;font-size:12.5px;}
-  .cr-bar .bl small{display:block;font-family:'Source Code Pro',monospace;font-size:10px;color:var(--muted);font-weight:400;}
+  .cr-bar .bl small{display:block;font-family:'Libre Franklin',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-size:10px;color:var(--muted);font-weight:400;}
   .cr-bar .track{position:relative;height:32px;background:var(--line-2);border-radius:8px;overflow:hidden;}
-  .cr-bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:8px;display:flex;align-items:center;justify-content:flex-end;padding-right:11px;color:#fff;font-family:'Source Code Pro',monospace;font-weight:700;font-size:12.5px;min-width:38px;}
+  .cr-bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:8px;display:flex;align-items:center;justify-content:flex-end;padding-right:11px;color:#fff;font-family:'Libre Franklin',system-ui,sans-serif;font-variant-numeric:tabular-nums;font-weight:700;font-size:12.5px;min-width:38px;}
   .cr-bar .fill.g{background:linear-gradient(90deg,#2A2E36,#3C424C);}
   .cr-bar .fill.o{background:linear-gradient(90deg,var(--orange-deep),var(--orange));}
-  .cr-bar .zero{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-family:'Source Code Pro',monospace;font-size:11.5px;color:var(--muted);}
+  .cr-bar .zero{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-family:'Space Mono',monospace;font-size:11.5px;color:var(--muted);}
 
   /* alert */
   .cr-alert{display:flex;gap:12px;border:1px solid var(--red);background:var(--red-bg);border-radius:14px;padding:14px 16px;margin-bottom:26px;}
@@ -466,24 +471,39 @@
   .cr tbody tr:nth-child(even) td{background:#FCFBF9;}
   .cr td.item{font-weight:700;color:var(--ink);width:18%;min-width:130px;}
   .cr td.item small{display:block;font-weight:400;color:var(--muted);font-size:10.5px;margin-top:2px;}
-  .cr td.val{font-family:'Source Code Pro',monospace;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap;width:14%;}
+  .cr td.val{font-family:'Libre Franklin',system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap;width:14%;}
   .cr td.val .n{color:var(--ink);font-weight:700;}
-  .cr td.val small{font-family:'Work Sans',sans-serif;color:var(--muted);font-size:10px;display:block;white-space:normal;margin-top:1px;letter-spacing:0;}
-  .cr td.na{color:#AAB0B8;font-style:italic;font-family:'Work Sans',sans-serif;}
+  .cr td.val small{font-family:'Libre Franklin',sans-serif;color:var(--muted);font-size:10px;display:block;white-space:normal;margin-top:1px;letter-spacing:0;}
+  .cr td.na{color:#AAB0B8;font-style:italic;font-family:'Libre Franklin',sans-serif;}
   .cr td.oc{background:#FFF7F1;} .cr tbody tr:nth-child(even) td.oc{background:#FEF3EA;}
   .cr td.verdict{width:30%;min-width:200px;font-size:11.5px;color:var(--ink-2);line-height:1.45;}
   .cr tr.tot td{background:#F0ECE4!important;} .cr tr.tot td.item{font-size:13px;} .cr tr.tot td.val .n{font-size:13.5px;}
-  .cr-pill{display:inline-block;font-family:'Source Code Pro',monospace;font-size:9px;letter-spacing:.02em;font-weight:700;padding:2px 8px;border-radius:999px;margin-right:6px;white-space:nowrap;background:var(--ink);color:#fff;}
+  .cr-pill{display:inline-block;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.02em;font-weight:700;padding:2px 8px;border-radius:999px;margin-right:6px;white-space:nowrap;background:var(--ink);color:#fff;}
   .cr-pill.tie{background:var(--line);color:var(--ink-2);}
   .cr-pill.up{background:var(--green-bg);color:var(--green);box-shadow:inset 0 0 0 1px var(--green);}
   .cr-pill.gap{background:var(--red-bg);color:var(--red);box-shadow:inset 0 0 0 1px var(--red);}
 
   /* bottom line */
   .cr-reco{border:1px solid var(--orange);background:linear-gradient(180deg,#FFF7F1,#FFFCFA);border-radius:14px;padding:16px 18px;margin-top:4px;}
-  .cr-reco .pl{font-family:'Source Code Pro',monospace;font-weight:700;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--orange-deep);margin-bottom:7px;}
+  .cr-reco .pl{font-family:'Space Mono',monospace;font-weight:700;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--orange-deep);margin-bottom:7px;}
   .cr-reco p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink-2);} .cr-reco b{color:var(--ink);}
   .cr-fine{font-size:10.5px;color:var(--muted);line-height:1.55;margin-top:20px;border-top:1px solid var(--line);padding-top:12px;}
-  .cr-dctl{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:9px;font-family:'Source Code Pro',monospace;font-size:9.5px;color:var(--muted);}
+  .cr-dctl{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:9px;font-family:'Space Mono',monospace;font-size:9.5px;color:var(--muted);}
+
+  /* RM-only internal panel (hidden on the client copy) */
+  .cr-rm{border:1px solid var(--orange);border-radius:15px;overflow:hidden;margin-bottom:18px;background:#fff;}
+  .cr-rm-h{background:var(--panel);color:#fff;padding:15px 18px;}
+  .cr-rm-k{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange-hi);font-weight:700;}
+  .cr-rm-h h2{font-family:'Space Grotesk','Libre Franklin',sans-serif;font-weight:700;font-size:17px;margin:5px 0 3px;letter-spacing:-.01em;}
+  .cr-rm-h p{margin:0;font-size:11.5px;color:#C4CAD2;line-height:1.5;}
+  .cr-rm-list{padding:6px 8px;}
+  .cr-find{display:flex;gap:12px;align-items:flex-start;padding:11px 12px;border-bottom:1px solid var(--line-2);font-size:12px;line-height:1.5;color:var(--ink-2);}
+  .cr-find:last-child{border-bottom:none;} .cr-find b{color:var(--ink);}
+  .cr-fk{flex:none;font-family:'Space Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap;margin-top:1px;}
+  .cr-find.gap .cr-fk{background:var(--red-bg);color:var(--red);box-shadow:inset 0 0 0 1px var(--red);}
+  .cr-find.reduce .cr-fk{background:var(--red-bg);color:var(--red);box-shadow:inset 0 0 0 1px var(--red);}
+  .cr-find.check .cr-fk{background:var(--blue-bg);color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue);}
+  .cr-find.ok .cr-fk{background:var(--green-bg);color:var(--green);box-shadow:inset 0 0 0 1px var(--green);}
 
   @media print{
     .cr{border-radius:0;background:#fff;box-shadow:none;}
@@ -492,6 +512,10 @@
     .cr thead th{position:static;}
   }
 
+  /* report view toggle (Client / RM) */
+  .viewtog{display:inline-flex;background:var(--ink-100,#ECEEF2);border-radius:9px;padding:3px;gap:2px;margin-left:10px;}
+  .viewtog .vt{border:none;background:transparent;font-family:'Saira',system-ui,sans-serif;font-weight:700;font-size:12px;letter-spacing:.01em;color:var(--ink-500,#5E6675);padding:7px 13px;border-radius:7px;cursor:pointer;}
+  .viewtog .vt.on{background:#fff;color:var(--ink-950,#0B0C0F);box-shadow:0 1px 3px rgba(11,12,15,.14);}
 </style>
 </head>
 <body>
@@ -2117,7 +2141,7 @@ function crLineVerdict(kind, curCell, cells, opts) {
 }
 
 // Largest limit increase across the whole comparison — drives the cover alert.
-function crBiggestUpgrade(buildings) {
+function crBiggestUpgrade(buildings, onlyKey) {
   let top = null;
   for (const b of buildings) {
     const opts = optionQuotes(b);
@@ -2126,7 +2150,8 @@ function crBiggestUpgrade(buildings) {
       const curLim = curCell ? parseLimit(curCell.curL) : null;
       if (curLim == null) return;
       let best = -1, names = [];
-      opts.forEach(q => { const l = q.lines.find(x => secKey(x.s) === sec.key); const pl = l && !l.propNq ? parseLimit(l.propL) : null;
+      opts.forEach(q => { if (onlyKey && (q.optionId || q.id) !== onlyKey) return;   // attribute to one option only
+        const l = q.lines.find(x => secKey(x.s) === sec.key); const pl = l && !l.propNq ? parseLimit(l.propL) : null;
         if (pl != null) { if (pl > best) { best = pl; names = [q.insurer || 'Cartrack']; } else if (pl === best) names.push(q.insurer || 'Cartrack'); } });
       if (best > curLim + 0.5) {
         const gain = best - curLim;
@@ -2239,21 +2264,116 @@ function crBuildingSection(b, opts, recId, idx) {
     el('div', { class: 'cr-tw' }, el('table', {}, el('thead', {}, head), el('tbody', {}, ...body, totRow))));
 }
 
-function crReco(op, up, rm) {
+// --- "How we do it now": cover-first findings, so the recommendation follows
+//     the manual rule — dearer-but-better still moves; only a genuine cover gap holds.
+// A line the CURRENT policy covers but an option did not quote (or a limit it drops).
+function crCoverFindings(withQuotes) {
+  const gaps = [], reductions = [], checks = [];
+  withQuotes.forEach(b => {
+    const opts = optionQuotes(b);
+    sectionUnion(opts).forEach(sec => {
+      const curCell = curCellFor(opts, sec.key);
+      const curHas = curCell && (curCell.cur != null || curCell.curL || curCell.curIncl || curCell.curStr);
+      const kind = crKind(sec.label);
+      opts.forEach(q => {
+        const who = q.insurer || 'Cartrack';
+        const l = q.lines.find(x => secKey(x.s) === sec.key);
+        if (curHas && (!l || l.propNq)) { if (kind !== 'sasria') gaps.push({ who, sec: sec.label, building: b.name }); }
+        else if (l && !l.propNq && (kind === 'liability' || kind === 'cover')) {
+          const cl = curCell ? parseLimit(curCell.curL) : null, pl = parseLimit(l.propL);
+          if (cl != null && pl != null && pl < cl - 0.5) reductions.push({ who, sec: sec.label, building: b.name, from: cl, to: pl });
+        }
+      });
+      if (kind === 'excess') {
+        const anyPct = (curCell && /%/.test((curCell.curStr || curCell.curL || '')))
+          || opts.some(q => { const l = q.lines.find(x => secKey(x.s) === sec.key); return l && !l.propNq && /%/.test((l.propStr || l.propL || '')); });
+        if (anyPct) checks.push({ sec: sec.label, building: b.name });
+      }
+    });
+  });
+  return { gaps, reductions, checks };
+}
+
+// Count of cover lines each option leaves unquoted that the current policy holds.
+function crGapCounts(withQuotes, options) {
+  const gc = {}; options.forEach(o => gc[o.key] = 0);
+  withQuotes.forEach(b => {
+    const opts = optionQuotes(b);
+    sectionUnion(opts).forEach(sec => {
+      const curCell = curCellFor(opts, sec.key);
+      const curHas = curCell && (curCell.cur != null || curCell.curL || curCell.curIncl || curCell.curStr);
+      if (!curHas || crKind(sec.label) === 'sasria') return;
+      opts.forEach(q => { const key = q.optionId || q.id; if (!(key in gc)) return;
+        const l = q.lines.find(x => secKey(x.s) === sec.key); if (!l || l.propNq) gc[key]++; });
+    });
+  });
+  return gc;
+}
+
+// Recommend the cheapest option that does NOT open a cover gap; only if every
+// option has gaps do we fall back to cheapest and flag it. (Upgrade, not downgrade.)
+function crRecommendId(withQuotes, options) {
+  if (!options.length) return null;
+  const gc = crGapCounts(withQuotes, options);
+  const minGap = Math.min(...options.map(o => gc[o.key]));
+  const eligible = options.filter(o => gc[o.key] === minGap);
+  const rec = eligible.reduce((m, e) => (m == null || e.prop < m.prop) ? e : m, null);
+  return rec ? rec.key : null;
+}
+
+// RM-only view: the internal findings & actions, hidden from the client copy.
+function crRmPanel(findings) {
+  const item = (sev, label, txt) => el('div', { class: 'cr-find ' + sev },
+    el('span', { class: 'cr-fk' }, label), el('div', { html: txt }));
+  const rows = [];
+  findings.gaps.forEach(g => rows.push(item('gap', 'Gap',
+    '<b>' + crEsc(g.who) + '</b> did not quote <b>' + crEsc(g.sec) + '</b>' + (g.building ? ' (' + crEsc(g.building) + ')' : '')
+    + ' — the current policy covers it. Confirm it is intentional or price it before presenting.')));
+  findings.reductions.forEach(r => rows.push(item('reduce', 'Cover \u2193',
+    '<b>' + crEsc(r.who) + '</b> drops <b>' + crEsc(r.sec) + '</b> from ' + fmtLimit(r.from) + ' to ' + fmtLimit(r.to)
+    + ' — a reduction in cover. Must be disclosed to the client in writing.')));
+  findings.checks.forEach(c => rows.push(item('check', 'Wording',
+    'Excess on <b>' + crEsc(c.sec) + '</b>' + (c.building ? ' (' + crEsc(c.building) + ')' : '')
+    + ' is percentage-based on at least one side — compare the policy wording, not just the rand figure.')));
+  if (!rows.length) rows.push(item('ok', 'Clear',
+    'No cover gaps, reductions or wording ambiguities were found across the compared options. This is a clean upgrade — proceed on price and the cover improvements above.'));
+  return el('div', { class: 'cr-rm' },
+    el('div', { class: 'cr-rm-h' },
+      el('span', { class: 'cr-rm-k' }, 'RM view \u00b7 internal \u2014 not on the client copy'),
+      el('h2', {}, 'Findings & actions before you present'),
+      el('p', {}, 'The move is justified wherever cover holds or improves. Only a genuine cover gap is a reason to stay.')),
+    el('div', { class: 'cr-rm-list' }, ...rows));
+}
+
+function crReco(op, up, rm, findings) {
   const rec = op.options.find(o => o.key === op.recId);
+  const cheapest = op.options.reduce((m, e) => (m == null || e.prop < m.prop) ? e : m, null);
   const parts = [];
   if (rec && op.options.length > 1) {
     const save = op.cur - rec.prop;
-    parts.push('<b>' + crEsc(rec.insurer || 'Cartrack') + '</b> is the lowest total at <b>' + crMoney(rec.prop, 0) + '/month</b>'
-      + (save > 0.5 ? ' — ' + crMoney(save, 0) + '/month (≈ ' + crMoney(save * 12, 0) + '/year) less than the current ' + crMoney(op.cur, 0) + '.' : '.'));
+    const dearerThanCheapest = cheapest && rec.key !== cheapest.key && rec.prop > cheapest.prop + 0.5;
+    if (dearerThanCheapest) {
+      parts.push('<b>' + crEsc(rec.insurer || 'Cartrack') + '</b> is the recommendation at <b>' + crMoney(rec.prop, 0) + '/month</b>'
+        + (save > 0.5 ? ' — still ' + crMoney(save, 0) + '/month under the current ' + crMoney(op.cur, 0) : '')
+        + '. It is ' + crMoney(rec.prop - cheapest.prop, 0) + '/month more than ' + crEsc(cheapest.insurer || 'the cheapest option')
+        + ', but it holds cover the cheaper option leaves out — a small saving does not offset a genuine gap.');
+    } else {
+      parts.push('<b>' + crEsc(rec.insurer || 'Cartrack') + '</b> is the lowest total at <b>' + crMoney(rec.prop, 0) + '/month</b>'
+        + (save > 0.5 ? ' — ' + crMoney(save, 0) + '/month (\u2248 ' + crMoney(save * 12, 0) + '/year) less than the current ' + crMoney(op.cur, 0) + ', with no cover gap against today.' : '.'));
+    }
   } else if (rec) {
     const save = op.cur - rec.prop;
-    parts.push('The proposed premium is <b>' + crMoney(rec.prop, 0) + '/month</b>'
-      + (save > 0.5 ? ', ' + crMoney(save * 12, 0) + '/year less than the current ' + crMoney(op.cur, 0) + '.' : '.'));
+    parts.push(save > 0.5
+      ? 'The proposed premium is <b>' + crMoney(rec.prop, 0) + '/month</b>, ' + crMoney(save * 12, 0) + '/year less than the current ' + crMoney(op.cur, 0) + '.'
+      : (save < -0.5
+        ? 'The proposed premium is <b>' + crMoney(rec.prop, 0) + '/month</b> \u2014 ' + crMoney(-save, 0) + '/month more than today. A move is still the right call where cover improves and no gap opens \u2014 see the cover story below.'
+        : 'The proposed premium is level with the current policy \u2014 the case for moving rests on the cover improvements below.'));
   }
   if (up) parts.push('It also lifts <b>' + crEsc(up.label.toLowerCase()) + '</b> cover to ' + fmtLimit(up.best)
-    + (up.mult && up.mult >= 1.5 ? ' (' + (Math.round(up.mult * 10) / 10) + '× the current limit)' : '') + ' — the most valuable improvement on the table.');
-  parts.push('Each cover line is compared above with the winning option and the reason. Confirm any not-quoted lines and final terms before presenting.');
+    + (up.mult && up.mult >= 1.5 ? ' (' + (Math.round(up.mult * 10) / 10) + '\u00d7 the current limit)' : '') + ' \u2014 the most valuable improvement on the table.');
+  const gapN = findings ? findings.gaps.length : 0;
+  if (gapN) parts.push('<b>Before moving:</b> ' + gapN + ' cover line' + (gapN > 1 ? 's are' : ' is') + ' not quoted by at least one option \u2014 confirm ' + (gapN > 1 ? 'they are' : 'it is') + ' intentional. Only a genuine cover gap is a reason to hold.');
+  else parts.push('No cover gaps against the current policy were found \u2014 the move is a clean upgrade. Confirm final terms before presenting.');
   return el('div', { class: 'cr-reco' },
     el('div', { class: 'pl' }, 'Recommendation'),
     el('p', { html: parts.join(' ') }));
@@ -2263,8 +2383,12 @@ function screenReport() {
   const rm = RMS.find(r => r.id === state.rmId) || RMS[0];
   const op = optionPortfolio();
   const withQuotes = state.buildings.filter(b => optionQuotes(b).length);
+  op.recId = crRecommendId(withQuotes, op.options) || op.recId;   // cover-first (upgrade, not downgrade)
+  const findings = crCoverFindings(withQuotes);
+  const rmView = state.reportView === 'rm';
   const today = new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
-  const up = crBiggestUpgrade(withQuotes);
+  const up = crBiggestUpgrade(withQuotes);                      // biggest upgrade across all options (the banner)
+  const recUp = crBiggestUpgrade(withQuotes, op.recId);        // the recommended option's OWN biggest upgrade
   const chips = [
     state.buildings.length > 1 ? el('span', { class: 'cr-chip' }, 'Risks ', el('b', {}, String(withQuotes.length))) : null,
     op.options.length ? el('span', { class: 'cr-chip' }, 'Options ', el('b', {}, String(op.options.length))) : null,
@@ -2274,8 +2398,10 @@ function screenReport() {
   return el('div', {},
     el('div', { class: 'eyebrow' }, 'Step 03'),
     el('h1', { class: 'pg' }, 'Client report'),
-    el('p', { class: 'lede' }, 'A client-ready comparison — the per-line verdicts and the recommendation are generated automatically. Print to PDF from the button below; page furniture is stripped.'),
-    el('div', { class: 'cr' },
+    el('p', { class: 'lede' }, rmView
+      ? 'RM working copy — the same comparison plus an internal findings & actions panel. Switch to the client view before you print for the client.'
+      : 'A client-ready comparison — the per-line verdicts and the recommendation are generated automatically. Print to PDF from the button below; page furniture is stripped.'),
+    el('div', { class: 'cr' + (rmView ? ' cr-rmmode' : '') },
       el('header', { class: 'cr-hero' },
         el('div', { class: 'cr-wm' },
           el('div', { class: 'logo', html: 'Cartrack <b>Insurance</b>' }),
@@ -2286,11 +2412,12 @@ function screenReport() {
           + ' — line by line, with a clear verdict on every section.'),
         chips.length ? el('div', { class: 'cr-chips' }, ...chips) : null),
       el('div', { class: 'cr-b' },
+        rmView ? crRmPanel(findings) : null,
         crVerdictCards(op),
         op.options.length ? crSavingsChart(op) : null,
         up ? crAlert(up) : null,
         ...withQuotes.map((b, i) => crBuildingSection(b, optionQuotes(b), op.recId, i)),
-        crReco(op, up, rm),
+        crReco(op, recUp, rm, findings),
         el('div', { class: 'cr-fine' },
           'Prepared by Cartrack Insurance Agency (Pty) Ltd (FSP 17266) for ' + (state.client.name || 'the client') + '. Figures are captured from insurer schedules and quotations and are subject to the terms, conditions and exclusions of the underlying policy documents, which prevail over this summary. E&OE. This is a premium comparison and does not itself constitute advice or an offer of cover.',
           el('div', { class: 'cr-dctl' },
@@ -2298,9 +2425,12 @@ function screenReport() {
             el('span', {}, 'Prepared ' + today + ' · ' + rm.name))))),
     el('div', { class: 'bar no-print' }, el('div', { class: 'bar-in' },
       el('button', { class: 'btn', onClick: () => go('review') }, '← Review'),
+      el('div', { class: 'viewtog', role: 'group', 'aria-label': 'Report view' },
+        el('button', { class: 'vt' + (!rmView ? ' on' : ''), onClick: () => { state.reportView = 'client'; save(); render(); } }, 'Client view'),
+        el('button', { class: 'vt' + (rmView ? ' on' : ''), onClick: () => { state.reportView = 'rm'; save(); render(); } }, 'RM view')),
       el('div', { style: 'flex:1' }),
       el('button', { class: 'btn', onClick: sendToBook }, 'Send to RM book →'),
-      el('button', { class: 'btn primary', onClick: () => window.print() }, 'Print / save as PDF'),
+      el('button', { class: 'btn primary', onClick: () => window.print() }, rmView ? 'Print RM copy' : 'Print / save as PDF'),
     )),
   );
 }
