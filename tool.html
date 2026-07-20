@@ -1173,9 +1173,110 @@ function fleetSasria(text, total) {
   const v = parseMoney2(m[1]);
   return (v && total && v > 5 && v < total * 0.25) ? v : null;
 }
+// ---- Cover-summary catalogue parser (fleet) ----
+// SA fleet schedules and quotes carry a summary table — "Cover Summary" (Merx/MMX,
+// VAPS), "PREMIUM BREAKDOWN" (Alpha), a Monthly Premium block (Ownsurance). Labels
+// differ but the shape is the same: section label followed by amount(s), monthly
+// last. This reads that table into canonical section names used on BOTH the
+// current and proposed side, so rows line up like a hand-built comparison.
+const FLEET_CATALOGUE=[
+ ['Trucks / heavy commercial', /\btrucks(?:\s+insured)?\b/i],
+ ['Trailers', /\btrailers(?:\s+insured)?\b/i],
+ ['LCVs / light delivery', /\blcv'?s?\b|light\s+delivery\s+vehicles?/i],
+ ['Cars / private vehicles', /private\s+type\s+vehicles|\bcars\s+insured\b|private\s+vehicles/i],
+ ['Cars — TPFT', /cars\s+tpft/i],
+ ['Motor premium', /motor\s+premium/i],
+ ['General premium', /general\s+premium/i],
+ ['Public liability', /public\s+liability/i],
+ ['Broadform liability', /broadform\s+liability/i],
+ ['Passenger liability', /passenger\s+liability/i],
+ ['Pollution liability', /pollution\s+liability(?!\s+excess)/i],
+ ['Liability', /\bliability\b(?!\s+to)/i],
+ ['Extensions', /\bextensions\b/i],
+ ['Goods in Transit', /goods\s+in\s+transit(?!\s+with)/i],
+ ['GIT basic excess reducer', /git\s+basic\s+excess\s+reducer/i],
+ ['GIT theft/hijack excess reducer', /git\s+theft\s*\/?\s*hijack\s+excess\s+reducer/i],
+ ['Motor glass / windscreen', /motor\s+glass|windscreen\s+cover/i],
+ ['Own damage excess reducer', /own\s+damage\s+excess\s+reducer/i],
+ ['Theft/hijack excess reducer', /theft\s*(?:and|\/)?\s*hijack\s+excess\s+reducer/i],
+ ['Third party excess reducer', /third\s+party\s+excess\s+reducer/i],
+ ['Loss of use', /loss\s+of\s+use/i],
+ ['Credit shortfall', /credit\s+shortfall/i],
+ ['Cross-border towing', /(?:recovery\s+and\s+)?cross[- ]?border\s+towing(?:\s+and\s+recovery)?/i],
+ ['Mechanical breakdown towing', /mechanical\s+breakdown\s+towing(?:\s+costs?)?/i],
+ ['Towing — ORS non-accidental', /\bors\s+extra\b/i],
+ ['Roadside assist', /(?:vaps\s+)?roadside\s+assist/i],
+ ['GIT 24/7 assist', /git\s+24\s*\/?\s*7\s+assist/i],
+ ['Towing', /\btowing\b/i],
+ ['Spillage clean-up (non-haz)', /non[- ]?haz\w*\s+spillage/i],
+ ['Merx Protect', /merx\s+protect/i],
+ ['Policy fund / OwnRship', /ownrship\s+benefits?\s*\w?|policy\s+fund/i],
+ ['Risk management fee', /risk\s+management\s+fee/i],
+ ['Group personal accident', /group\s+personal\s+accident/i],
+ ['VAPS', /\bvaps\b/i],
+ ['Broker fee', /professional\s*\/?\s*broker\s+fee|broker\s+fee/i],
+ ['SASRIA', /\bsasria\b/i],
+ ['Motor (vehicles)', /\bmotor\b/i],
+];
+const _NEXT_LABEL=new RegExp('('+FLEET_CATALOGUE.map(e=>e[1].source).join('|')+'|\\btotal\\b|gross\\s+costs|annual\\s+savings)','i');
+function parseCoverCatalogue(text){
+  if(!text) return [];
+  // bound the search to the summary region when an anchor exists — wording pages
+  // repeat these labels with limits (not premiums) and would poison the read.
+  const am=/cover\s+summ?[ae]ry|premium\s+breakdown|summary:\s*premium\s+details|monthly\s+premium/i.exec(text);
+  let hay=am?text.slice(am.index, am.index+5000):text;
+  const out=[];
+  for(const [canon,re] of FLEET_CATALOGUE){
+    const g=new RegExp(re.source,'gi'); let m;
+    while((m=g.exec(hay))){
+      // the row ends where the NEXT known label (or a total line) begins — without
+      // this, a window bleeds into the following row and reads its amount.
+      let win=hay.slice(m.index+m[0].length, m.index+m[0].length+110);
+      const nx=_NEXT_LABEL.exec(win);
+      if(nx && nx.index>0) win=win.slice(0,nx.index);
+      if(/not\s+taken|not\s+included|not\s+selected/i.test(win)){ hay=hay.slice(0,m.index)+' '.repeat(m[0].length)+hay.slice(m.index+m[0].length); break; }
+      const amts=[...win.matchAll(/(?:R\s*)?(\d{1,3}(?:[ ,]\d{3})*\.\d{2})/g)].map(x=>parseMoney2(x[1]));
+      // one amount = the premium · three or more = value/annual/monthly (take the third)
+      const v=!amts.length?null:(amts.length>=3?amts[2]:amts[amts.length-1]);
+      if(v!=null && v>0 && v<2000000){
+        out.push({s:canon, v:+v.toFixed(2)});
+        hay=hay.slice(0,m.index)+' '.repeat(m[0].length)+hay.slice(m.index+m[0].length);  // blank so broader labels can't re-hit
+        break;
+      }
+      // label present but no premium here — blank it and keep scanning
+      hay=hay.slice(0,m.index)+' '.repeat(m[0].length)+hay.slice(m.index+m[0].length);
+      if(g.lastIndex>m.index) g.lastIndex=m.index+m[0].length;
+      if(out.length>60) break;
+    }
+  }
+  return out;
+}
+// Name the insurer behind a fleet quote file — fleet quotes are often UMA paper
+// the general INSURERS list doesn't know (Alpha, Ownsurance, VAPS…).
+function fleetInsurerName(f){
+  const hay=((f&&f.name)||'')+' '+(((f&&f.text)||'').slice(0,4000));
+  if(/alpha/i.test(hay)) return 'Alpha';
+  if(/ownsurance|ownrship/i.test(hay)) return 'Ownsurance';
+  if(/\bvaps\b|king\s*price/i.test(hay)) return 'King Price (VAPS)';
+  if(/santam/i.test(hay)) return 'Santam';
+  const u=guessInsurer((f&&f.text)||'',(f&&f.name)||'');
+  return u||'';
+}
 // Parse a proposed fleet quote into comparison sections. Detailed per-fleet
 // breakdown for the FleetBüddy layout; a generic total-premium line otherwise.
 function parseFleetSections(text) {
+  // Catalogue read first: a full section breakdown beats any total-only fallback.
+  const cat = parseCoverCatalogue(text);
+  if (cat.length >= 3) {
+    const secs = cat.map(c => ({ s: c.s, prop: c.v }));
+    const sum = +cat.reduce((a, c) => a + c.v, 0).toFixed(2);
+    const stated = fleetTotalPremium(text);
+    // Trust the itemised breakdown ONLY if it reconciles to the stated total.
+    // If the layout beat the reader, keep the total (always reliable) and let
+    // the RM itemise in Review — never show line figures we can't stand behind.
+    if (!stated || Math.abs(sum - stated) <= Math.max(2, stated * 0.005)) return { secs, grand: stated || sum };
+    return { secs: [{ s: 'Total premium', prop: stated }], grand: stated, unreconciled: true };
+  }
   const first = re => { const m = re.exec(text); return m ? _fnum(m[1]) : null; };
   const fleets = [];
   const re = /Item\s+(\d+)\s*[-–]\s*([A-Za-z][A-Za-z0-9 ]*?)\s+(\d+)\s+Sum Insured\s*R([\d ,]+)[\s\S]{0,180}?Total Premium\s*R([\d ,]+\.\d{2})/g;
@@ -1209,6 +1310,16 @@ function parseFleetSections(text) {
 // Returns { total, parts:[{s,cur}] } so the current side is transparent + editable.
 function parseFleetCurrent(text) {
   const t = text || '';
+  // Catalogue read first — emits the SAME canonical section names as the proposed
+  // side, so current and proposed line up row-for-row like a hand-built comparison.
+  const cat = parseCoverCatalogue(t);
+  if (cat.length >= 3) {
+    const parts = cat.map(c => ({ s: c.s, cur: c.v }));
+    const sum = +cat.reduce((a, c) => a + c.v, 0).toFixed(2);
+    const stated = fleetTotalPremium(t);
+    if (!stated || Math.abs(sum - stated) <= Math.max(2, stated * 0.005)) return { total: stated || sum, parts };
+    return { total: stated, parts: [{ s: 'Current premium (as billed)', cur: stated }], unreconciled: true };
+  }
   const base = fleetTotalPremium(t);
   if (base == null) return { total: null, parts: [] };
   // Separately-stated Risk Services / administration fee (a fraction of the base).
@@ -1263,9 +1374,24 @@ function genericSeed() {
   const splitCur = curParts.length > 1;
   const qFiles = state.files.quote.filter(f => f.status === 'ok');
   // One column per PROPOSAL (option). Files dropped under the same proposal are
-  // combined — their premiums summed into a single column.
+  // combined — their premiums summed into a single column. BUT if several files
+  // landed on one option and they are clearly DIFFERENT insurers (Alpha +
+  // Ownsurance dropped together), split them into one option each — that is
+  // what the RM meant.
   const byOpt = new Map(); const defOid = (state.options[0] && state.options[0].id) || 'o1';
   qFiles.forEach(f => { const oid = f.optionId || defOid; if (!byOpt.has(oid)) byOpt.set(oid, []); byOpt.get(oid).push(f); });
+  if (byOpt.size === 1 && qFiles.length > 1) {
+    const groups = new Map();
+    qFiles.forEach(f => { const nm = fleetInsurerName(f) || 'Proposal'; if (!groups.has(nm)) groups.set(nm, []); groups.get(nm).push(f); });
+    if (groups.size > 1) {
+      byOpt.clear(); state.options = [];
+      for (const [nm, fs] of groups) {
+        const oid = uid(); state.options.push({ id: oid, insurer: nm });
+        fs.forEach(f => f.optionId = oid);
+        byOpt.set(oid, fs);
+      }
+    }
+  }
   const optionIds = byOpt.size ? [...byOpt.keys()] : [defOid];
   optionIds.forEach(oid => {
     const files = byOpt.get(oid) || [];
@@ -1283,10 +1409,14 @@ function genericSeed() {
     const insurer = (opt && opt.insurer && opt.insurer.trim()) ? opt.insurer.trim() : (files[0] ? proposedInsurer(files[0].text, files[0].name) : 'Cartrack');
     const q = newQuote(bld.id, insurer, files[0] ? guessQuoteNo(files[0].text, files[0].name) : '');
     q.optionId = oid; if (files[0]) q.srcId = files[0].id;
-    q.lines = [];
-    curParts.forEach(p => q.lines.push({ id: uid(), s: p.s, curL: '', cur: p.cur, propL: '', prop: null, propNq: true, curStr: '', propStr: 'n/a' }));
+    // Merge current + proposed into row-aligned lines by canonical section name,
+    // exactly like a hand-built comparison: one row per section, both columns.
+    const lineMap = new Map(); q.lines = [];
+    const touch = (name) => { const k = canonSection(name); let l = lineMap.get(k); if (!l) { l = newLine(name); lineMap.set(k, l); q.lines.push(l); } return l; };
+    curParts.forEach(p => { const l = touch(p.s); l.cur = p.cur; });
     const secList = order.length ? order.map(k => ({ s: k, prop: +combined.get(k).toFixed(2) })) : [{ s: 'Total premium', prop: null }];
-    secList.forEach(s => q.lines.push({ id: uid(), s: s.s, curL: '', cur: null, propL: '', prop: s.prop, curStr: '', propStr: '' }));
+    secList.forEach(sx => { const l = touch(sx.s); l.prop = sx.prop; });
+    q.lines.forEach(l => { if (l.cur != null && l.prop == null && !l.propIncl) { l.propNq = true; l.propStr = 'Not quoted'; } });
     const notes = [];
     if (splitCur) notes.push('Current premium shown all-in (cover + Risk services/fees + SASRIA) so it compares like-for-like with the proposed premium. Confirm each part against the schedule.');
     if (converted) notes.push('Premiums stated per year on a quote are shown here per month (÷12). Confirm the basis of every figure before presenting.');
