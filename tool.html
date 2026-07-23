@@ -863,7 +863,13 @@ function guessQuoteNo(text, fname) {
 }
 function guessInsurer(text, fname) {
   const hay = (fname + ' ' + (text || '')); // scan the full text, not a prefix
-  for (const ins of INSURERS) if (new RegExp('\\b' + esc(ins) + '\\b','i').test(hay)) return ins;
+  for (const ins of INSURERS) {
+    // "Western" the insurer must not fire on "Western Cape" — the province is
+    // in half of all SA policy wordings (a Bryte quote once headed "Cartrack ·
+    // Western" off its territorial clause).
+    const re = ins === 'Western' ? /\bwestern\b(?!\s+cape)/i : new RegExp('\\b' + esc(ins) + '\\b', 'i');
+    if (re.test(hay)) return ins;
+  }
   return '';
 }
 // The quotes panel holds Cartrack proposals, so the proposed insurer is
@@ -915,7 +921,39 @@ const fmtLimit = n => n == null ? '' : n >= 1e6 ? 'R ' + (n/1e6).toFixed(2) + 'M
 /* Proposal (quote PDF): "SUMMARY OF COVER … DESCRIPTION MONTHLY PREMIUM
    BUILDINGS COMBINED R1 876,23 … TOTAL PREMIUM: R7 874,57".
    SASRIA sub-rows are summed into one SASRIA line; ASSIST becomes fees. */
+/* Bryte quote summary: "Section of Cover  Items  Cover Inc.  Sasria Included
+   Sum Insured  Monthly Premium" — rows of `name  count  Yes  Yes|N/A
+   [R sum-insured]  R premium`, then Cover Sub-Total / Sasria Sub-Total /
+   Fee Sub-Total / Total Monthly Payment. Accepted ONLY when the rows sum to
+   the Cover Sub-Total and the sub-totals sum to the Total Monthly Payment. */
+function parseProposalBryte(text) {
+  const start = /Section of Cover\s+Items\s+Cover\s+Inc/i.exec(text || '');
+  if (!start) return null;
+  const region = text.slice(start.index, start.index + 3000);
+  const rows = [];
+  for (const m of region.matchAll(/([A-Z][A-Za-z &\/'()\-]{2,45}?)\s+\d{1,3}\s+(?:Yes|No)\s+(?:Yes|No|N\/A)\s+(?:R([\d ,.]*\d)\s+)?R([\d ,.]*\d\.\d{2})/g)) {
+    const name = m[1].trim().split(/\s{2,}/).pop().trim();  // drop glued header/cell text
+    if (!name || /SECTION|PREMIUM|SUMMARY|TOTAL|INSURED/i.test(name)) continue;
+    const amt = parseMoney2(m[3]);
+    if (amt == null || amt <= 0) continue;
+    rows.push({ s: name.length <= 4 ? name : titleCase(name), amt, si: m[2] ? parseMoney(m[2]) : null });
+  }
+  if (rows.length < 2) return null;
+  const g1 = re => { const m = re.exec(region); return m ? parseMoney2(m[1]) : null; };
+  const coverSub = g1(/Cover Sub-?Total\s+R([\d ,.]*\d)/i);
+  const sasSub = g1(/Sasria Sub-?Total\s+R([\d ,.]*\d)/i);
+  const feeSub = g1(/Fee Sub-?Total\s+R([\d ,.]*\d)/i);
+  const total = g1(/Total Monthly Payment\s+R([\d ,.]*\d)/i);
+  const sum = +rows.reduce((s, r) => s + r.amt, 0).toFixed(2);
+  if (coverSub == null || Math.abs(sum - coverSub) > 2) return null;
+  if (total != null && Math.abs(coverSub + (sasSub || 0) + (feeSub || 0) - total) > 2) return null;
+  if (sasSub) rows.push({ s: 'SASRIA', amt: sasSub });
+  if (feeSub) rows.push({ s: 'Broker & admin fees', amt: feeSub });
+  return { rows, zeroSections: [], total: total != null ? total : +(coverSub + (sasSub || 0) + (feeSub || 0)).toFixed(2) };
+}
 function parseProposalProp(text) {
+  const bry = parseProposalBryte(text);
+  if (bry) return bry;
   const start = /SUMMARY OF COVER/i.exec(text || '');
   if (!start) return { rows: [], total: null };
   const endM = /TOTAL PREMIUM\s*:?\s*R([\d ]+(?:,\d{2})?)/i.exec(text.slice(start.index));
@@ -958,11 +996,50 @@ function parseScheduleOUT(text) {
   m = /Total premium\s*\(Including VAT\)\s+R([\d,]+\.\d{2})/i.exec(text);
   return { rows, total: m ? parseMoney(m[1]) : null };
 }
+/* Frontline UMA / Old Mutual Insure schedule (Ballast-style): "SUMMARY OF
+   COVER AND PREMIUM PAYABLE" table — one row per section, "Yes" + one or two
+   amounts (pro-rata first, monthly last; comma decimals), then a reversed
+   footer: "R21 741,84 R828,78 Sub-Total: R184,88 Sasria: R496,63 Fees:
+   Total: R828,78 R22 423,35". Accepted ONLY when the rows reconcile: section
+   sum ≈ one of the Sub-Total figures AND sub + SASRIA + fees ≈ one of the
+   Total figures — otherwise return null and let the caller fall through. */
+function parseScheduleFrontline(text) {
+  const start = /SUMMARY OF COVER AND PREMIUM PAYABLE/i.exec(text || '');
+  if (!start) return null;
+  const region = text.slice(start.index, start.index + 4500);
+  const rows = [];
+  for (const m of region.matchAll(/([A-Z][A-Za-z &\/'()\-]{2,45}?)\s+Yes\s+R([\d .,]*\d)(?:\s+R([\d .,]*\d))?\s+(?=Yes\b|Not\s+Applicable)/g)) {
+    // column runs can glue the previous cell onto the name — keep the last segment
+    const name = m[1].trim().split(/\s{2,}/).pop().trim();
+    if (!name || /SUMMARY|SECTION|PREMIUM|TOTAL|COVER TAKEN|APPLICABLE/i.test(name)) continue;
+    const amt = parseMoney2(m[3] || m[2]);   // monthly is the LAST amount on the row
+    if (amt == null || amt <= 0) continue;
+    rows.push({ s: name.length <= 4 ? name : titleCase(name), amt, si: null });
+  }
+  if (rows.length < 2) return null;
+  const sum = +rows.reduce((s, r) => s + r.amt, 0).toFixed(2);
+  const sub = /R([\d .,]*\d)\s+R([\d .,]*\d)\s+Sub-?Total:/i.exec(region);
+  const sas = /R([\d .,]*\d)\s+Sasria:/i.exec(region);
+  const fee = /R([\d .,]*\d)\s+Fees:/i.exec(region);
+  const tot = /Total:\s+R([\d .,]*\d)\s+R([\d .,]*\d)/i.exec(region);
+  const subM = sub ? [parseMoney2(sub[1]), parseMoney2(sub[2])].find(v => v != null && Math.abs(v - sum) <= 2) : null;
+  if (subM == null) return null;
+  const sasV = sas ? parseMoney2(sas[1]) : null;
+  const feeV = fee ? parseMoney2(fee[1]) : null;
+  const allIn = +(subM + (sasV || 0) + (feeV || 0)).toFixed(2);
+  const totV = tot ? [parseMoney2(tot[1]), parseMoney2(tot[2])].find(v => v != null && Math.abs(v - allIn) <= 2) : null;
+  if (totV == null) return null;
+  if (sasV) rows.push({ s: 'SASRIA', amt: sasV });
+  if (feeV) rows.push({ s: 'Broker & admin fees', amt: feeV });
+  return { rows, total: totV };
+}
 /* Schedule (e.g. Bryte): "PREMIUM SCHEDULE AND INDEX OF COVER … BUILDINGS
    COMBINED NO YES 2 351.10 R R - R 2 38 717 000 …", then Sasria / fees /
    additional-services and a stated TOTAL. Dispatches to OUTsurance when the
    Bryte-style index is absent. */
 function parseScheduleCur(text) {
+  const fl = parseScheduleFrontline(text);
+  if (fl) return fl;
   const start = /PREMIUM SCHEDULE AND INDEX OF COVER/i.exec(text || '');
   if (!start) return parseScheduleOUT(text) || { rows: [], total: null };
   const region = text.slice(start.index, start.index + 6000);
@@ -1011,9 +1088,15 @@ const SECTION_ALIASES = [
   { canon: 'THEFT', re: /\btheft\b/i },
   { canon: 'GROUP PERSONAL ACCIDENT', re: /group personal accident|personal accident/i },
   { canon: 'TRUSTEES LIABILITY', re: /trustees?/i },
-  { canon: 'BROKER & ASSIST FEES', re: /broker|assist|policy fee|admin fee|sundry|risk services?/i },
+  // No bare "assist" here: Roadside Assistance and One-Loyalty-style Assist
+  // products are their own comparison rows, not part of the broker-fee row —
+  // only names that say fee-ish things fold into fees.
+  { canon: 'BROKER & ASSIST FEES', re: /broker|assist fees?|policy fee|admin fee|sundry|risk services?/i },
   { canon: 'ADDITIONAL SERVICES', re: /additional services?/i },
   { canon: 'SASRIA', re: /sasria/i },
+  // "MOTOR" on a schedule vs "Motor Specified" on a quote vs "Motor (vehicles)"
+  // from the fleet reader — one comparison row. Traders/glass stay separate.
+  { canon: 'MOTOR', re: /^motor\b(?!\s+(?:traders?|glass))/i },
   // Fallback rows from the fleet readers — kept LAST so every specific section
   // above wins first. The current side seeds "Current premium (as billed)" and
   // the proposed side "Total premium"; without a shared canonical key they land
@@ -1083,7 +1166,10 @@ function buildComparisonLines(curRows, prop) {
   for (const e of map.values()) {
     if (e.cur != null && e.prop == null) {
       if (zeroKeys.has(key(e.s))) { e.prop = 0; e.propL = 'Included'; }
-      else e.propStr = 'Not quoted';
+      // set the FLAG, not just the display text — gap findings and the
+      // recommendation test propNq, and a text-only "Not quoted" left them
+      // reporting "no cover gaps" under a table that showed one.
+      else { e.propNq = true; e.propStr = 'Not quoted'; }
     }
   }
   return [...map.values()];
@@ -2522,7 +2608,7 @@ function crCoverFindings(withQuotes) {
       opts.forEach(q => {
         const who = q.insurer || 'Cartrack';
         const l = q.lines.find(x => secKey(x.s) === sec.key);
-        if (curHas && (!l || l.propNq)) { if (kind !== 'sasria') gaps.push({ who, sec: sec.label, building: b.name }); }
+        if (curHas && (!l || l.propNq)) { if (kind !== 'sasria' && kind !== 'fees') gaps.push({ who, sec: sec.label, building: b.name }); }
         else if (l && !l.propNq && (kind === 'liability' || kind === 'cover')) {
           const cl = curCell ? parseLimit(curCell.curL) : null, pl = parseLimit(l.propL);
           if (cl != null && pl != null && pl < cl - 0.5) reductions.push({ who, sec: sec.label, building: b.name, from: cl, to: pl });
@@ -2556,7 +2642,7 @@ function crGapCounts(withQuotes, options) {
     sectionUnion(opts).forEach(sec => {
       const curCell = curCellFor(opts, sec.key);
       const curHas = curCell && (curCell.cur != null || curCell.curL || curCell.curIncl || curCell.curStr);
-      if (!curHas || crKind(sec.label) === 'sasria') return;
+      if (!curHas || crKind(sec.label) === 'sasria' || crKind(sec.label) === 'fees') return;
       opts.forEach(q => { const key = q.optionId || q.id; if (!(key in gc)) return;
         const l = q.lines.find(x => secKey(x.s) === sec.key); if (!l || l.propNq) gc[key]++; });
     });
