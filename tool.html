@@ -537,6 +537,24 @@
     .cr tbody tr{break-inside:avoid;} .cr-sh,.cr-eyerow,.cr-rm-sub{break-after:avoid;}
   }
 
+  /* ---- read-status badges + escalation + draft resume + misc ---- */
+  .readtag{display:inline-block;margin-left:9px;font-family:'Space Mono',monospace;font-size:8.5px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;padding:2px 9px;border-radius:999px;vertical-align:1px;}
+  .readtag.ok{background:#E7F4EE;color:#12936A;box-shadow:inset 0 0 0 1px #12936A;}
+  .readtag.warn{background:#FAF0D9;color:#8A610C;box-shadow:inset 0 0 0 1px #B07D12;}
+  .readtag.err{background:#FBEAE8;color:#D8443C;box-shadow:inset 0 0 0 1px #D8443C;}
+  .escalate{margin-top:12px;border-left:3px solid #B07D12;background:#FAF0D9;border-radius:0 8px 8px 0;
+    padding:11px 14px;font-size:12.5px;line-height:1.5;color:var(--ink-800,#1E222A);}
+  .escalate .btn{text-decoration:none;}
+  .draftbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;
+    background:#fff;border:1px solid var(--line,#CDD2DB);border-left:4px solid var(--orange-500,#F47735);
+    border-radius:10px;padding:13px 16px;margin:0 0 18px;box-shadow:0 4px 14px rgba(11,12,15,.08);}
+  .draftbar b{font-family:var(--font-head);font-size:14px;}
+  .draftbar .ds{font-size:11.5px;color:var(--ink-500,#5E6675);margin-top:2px;}
+  .draftbar .da{display:flex;gap:8px;}
+  .wel-top .appver{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;color:#A8AFBC;margin-left:auto;margin-right:14px;align-self:center;}
+  .printhint{max-width:var(--maxw);margin:10px auto 0;padding:0 16px;font-size:11px;color:var(--ink-500,#5E6675);text-align:right;}
+
   /* report view toggle (Client / RM) */
   .viewtog{display:inline-flex;background:var(--ink-100,#ECEEF2);border-radius:9px;padding:3px;gap:2px;margin-left:10px;}
   .viewtog .vt{border:none;background:transparent;font-family:'Saira',system-ui,sans-serif;font-weight:700;font-size:12px;letter-spacing:.01em;color:var(--ink-500,#5E6675);padding:7px 13px;border-radius:7px;cursor:pointer;}
@@ -623,6 +641,13 @@ const CLIENT_TYPES = [
 ];
 
 const STORE_KEY = 'ct-compare-v1';
+const APP_VERSION = 'v2026.07.23a';   // shown on the welcome screen + report fine print
+// Draft safety-net: phones evict background tabs mid-comparison. The draft
+// stays on this device only, is offered for resume on the next open, expires
+// after 7 days, and is cleared on Reset and on hand-off to the book.
+const DRAFT_KEY = 'ct-compare-draft-v1';
+const DRAFT_TTL = 7 * 864e5;
+let PENDING_DRAFT = null;
 // Where the RM System lives. A won comparison is handed off to the book via
 // <RM_SYSTEM_URL>#import=<base64url payload> — kept decoupled (no DB creds here).
 const RM_SYSTEM_URL = 'https://cartrack-commercial.github.io/cartrack-rm-system/';
@@ -639,19 +664,35 @@ const blank = () => ({
 let state = load();
 function load() {
   try {
-    // Client data must never linger on a device between visits: purge any copy
-    // saved by older builds (localStorage persisted across sessions), then read
-    // only sessionStorage — survives an accidental refresh mid-comparison, but
-    // every new visit (new tab / reopened browser) starts clean.
+    // Client data must not linger silently between visits: purge any copy
+    // saved by older builds, and read live state only from sessionStorage.
+    // The one exception is the EXPLICIT draft (DRAFT_KEY): offered for resume
+    // on a fresh open, never auto-loaded, auto-expired after 7 days.
     try { localStorage.removeItem(STORE_KEY); } catch {}
-    const s = JSON.parse(sessionStorage.getItem(STORE_KEY));
+    let s = null;
+    try { s = JSON.parse(sessionStorage.getItem(STORE_KEY)); } catch {}
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      const live = d && d.state && d.state.rmChosen
+        && ((d.state.files.schedule.length + d.state.files.quote.length) > 0 || (d.state.buildings || []).length > 0);
+      if (d && d.ts && live && Date.now() - d.ts < DRAFT_TTL) {
+        if (!s || !s.files || !s.rmChosen) PENDING_DRAFT = d;   // fresh tab → offer resume
+      } else localStorage.removeItem(DRAFT_KEY);
+    } catch { try { localStorage.removeItem(DRAFT_KEY); } catch {} }
     if (!s || !s.files) return blank();
     s.buildings ||= []; s.quotes ||= []; s.seeded ||= false;
     if (!s.options || !s.options.length) s.options = [{ id: uid(), insurer: '' }];
     return s;
   } catch { return blank(); }
 }
-function save() { try { sessionStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {} }
+function save() {
+  try { sessionStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {}
+  try {
+    if (state.rmChosen && ((state.files.schedule.length + state.files.quote.length) > 0 || state.buildings.length))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ts: Date.now(), state }));
+  } catch {}
+}
+function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch {} PENDING_DRAFT = null; }
 
 const $ = (s, r=document) => r.querySelector(s);
 const el = (tag, props={}, ...kids) => {
@@ -774,6 +815,7 @@ function sendToBook() {
     ts: Date.now(),
   };
   window.open(RM_SYSTEM_URL + '#import=' + b64urlEncode(payload), '_blank', 'noopener');
+  clearDraft();   // handed off to the book — the on-device draft has done its job
 }
 
 /* ---------- OCR fallback for scanned PDFs (in-browser, Tesseract) ---------- */
@@ -1529,7 +1571,14 @@ function genericSeed() {
   let curTotal = null, curParts = [], converted = false;
   for (const f of state.files.schedule) {
     if (f.status !== 'ok') continue;
-    const cur = parseFleetCurrent(f.text); if (cur.total == null) continue;
+    const cur = parseFleetCurrent(f.text);
+    // per-file read verdict, surfaced on Review so a non-itemising layout is
+    // visible (and escalatable) instead of a silent fallback
+    f.readNote = cur.unreconciled ? { k: 'total', why: 'itemised lines did not reconcile to the stated total' }
+      : cur.parts.length >= 3 ? { k: 'item' }
+      : cur.total != null ? { k: 'total', why: 'summary table not recognised — only the total premium was read' }
+      : { k: 'none', why: 'no stated total premium found in this document' };
+    if (cur.total == null) continue;
     const annual = premiumIsAnnual(f.text); const monthly = annual ? cur.total / 12 : cur.total;
     if (monthly > (curTotal || 0)) {
       curTotal = monthly;
@@ -1567,7 +1616,12 @@ function genericSeed() {
     const combined = new Map(), order = [];
     files.forEach(f => {
       const annual = premiumIsAnnual(f.text); if (annual) converted = true;
-      parseFleetSections(f.text).secs.forEach(s => {
+      const r = parseFleetSections(f.text);
+      f.readNote = r.unreconciled ? { k: 'total', why: 'itemised lines did not reconcile to the stated total' }
+        : r.secs.length >= 3 ? { k: 'item' }
+        : r.secs.some(s => s.prop != null) ? { k: 'total', why: 'summary table not recognised — only the total premium was read' }
+        : { k: 'none', why: 'no premium figures found in this document' };
+      r.secs.forEach(s => {
         const v = (annual && s.prop != null) ? s.prop / 12 : s.prop;
         if (!combined.has(s.s)) { combined.set(s.s, 0); order.push(s.s); }
         combined.set(s.s, (combined.get(s.s) || 0) + (v || 0));
@@ -1597,8 +1651,114 @@ function genericSeed() {
     if (notes.length) q.advisories = notes.join('\n');
     state.quotes.push(q);
   });
+  seedVehiclesAndTerms();
   state.seeded = true; save();
   return true;
+}
+
+/* ---------- Vehicle-schedule + excess-terms readers ---------- */
+// Bryte quote items: "Item 1 - 2019 SUZUKI ERTIGA 1.5 GL JF34KBGP  Item Premium
+// R670.40 … Year 2019 Model ERTIGA 1.5 GL … Make SUZUKI  Registration Number
+// JF34KBGP … Vehicle Sum Insured Retail Value". Non-vehicle items (all-risk,
+// electronics) have no Registration/Vehicle fields and are skipped.
+function parseVehiclesBryte(text) {
+  const out = [];
+  for (const blk of (text || '').split(/Item \d+ - /).slice(1)) {
+    const b = blk.slice(0, 1600);
+    if (!/Registration Number|Vehicle Type|Chassis Number/i.test(b)) continue;
+    const reg = (/Registration Number\s+(TBA|[A-Z0-9]{4,12})\b/i.exec(b) || [])[1] || '';
+    const year = (/\bYear\s+((?:19|20)\d{2})\b/.exec(b) || [])[1] || '';
+    const make = (/\bMake\s+([A-Z][A-Za-z \-&]{1,18}?)\s{2,}/.exec(b) || [])[1] || '';
+    const model = (/\bModel\s+(.{2,40}?)\s{2,}/.exec(b) || [])[1] || '';
+    const siM = /Vehicle Sum Insured\s+(Retail Value|R[\d ,.]*\d)/i.exec(b);
+    const value = siM ? (/^R/.test(siM[1]) ? fmtLimit(parseMoney2(siM[1])) : 'Retail value') : '';
+    const head = b.slice(0, 90).split(/\s{2,}/)[0].trim();
+    const desc = [year, make, model].filter(Boolean).join(' ') || head.replace(reg, '').trim();
+    if (reg || desc) out.push({ reg, desc, value });
+  }
+  return out;
+}
+// Frontline/OM schedule vehicles: colon-labelled blocks — "Manufacturer :
+// SUZUKI  R658.80 R 130 200.00 Model : S-PRESSO 1.0 GL+ Year : 2022 …
+// Registration number : KR83PVGP". Premium and sum insured sit glued after
+// the manufacturer; the sum insured is the larger of the two.
+function parseVehiclesFrontline(text) {
+  const out = [];
+  for (const blk of (text || '').split(/Manufacturer\s*:/).slice(1)) {
+    const b = blk.slice(0, 900);
+    const reg = (/Registration number\s*:\s*(TBA|[A-Z0-9]{4,12})\b/i.exec(b) || [])[1] || '';
+    const make = (/^\s*([A-Za-z][A-Za-z \-&]*?)\s+R[\d ]/.exec(b) || [])[1] || '';
+    const model = (/Model\s*:\s*(.+?)\s+Year\s*:/.exec(b) || [])[1] || '';
+    const year = (/Year\s*:\s*((?:19|20)\d{2})\b/.exec(b) || [])[1] || '';
+    const am = /R\s?([\d ,.]*\d)\s+R\s?([\d ,.]*\d)/.exec(b);
+    const value = am ? fmtLimit(Math.max(parseMoney2(am[1]) || 0, parseMoney2(am[2]) || 0)) : '';
+    if (!reg && !(make && model)) continue;
+    out.push({ reg, desc: [year, make.trim(), model.trim()].filter(Boolean).join(' '), value });
+  }
+  return out;
+}
+// Bryte motor-section terms: third-party & passenger liability limits and the
+// basic-excess waiver flag — the waiver family is exactly the cover the
+// comparison method leads with on fleets.
+function parseTermsBryte(text) {
+  const t = text || ''; const out = {};
+  let m = /Liability to Third Parties\s+Yes\s+R([\d ,.]*\d)/i.exec(t);
+  if (m) out.tpl = fmtLimit(parseMoney2(m[1]));
+  const g = /Passenger liability\s+Yes\s+R([\d ,.]*\d)/gi; let pm;
+  while ((pm = g.exec(t))) {
+    if (!/unauthorised\s*$/i.test(t.slice(Math.max(0, pm.index - 14), pm.index))) { out.pll = fmtLimit(parseMoney2(pm[1])); break; }
+  }
+  m = /Waiver of basic compulsory first amount payable\s+(Yes|No)/i.exec(t);
+  if (m) out.waiver = /yes/i.test(m[1]) ? 'Included' : 'Not taken';
+  return out;
+}
+// Seed the vehicle table (merged by registration) and per-proposal excess/
+// liability terms. Never clobbers rows the RM already has.
+function seedVehiclesAndTerms() {
+  if (policyKind() !== 'motor') return;
+  const b = state.buildings[0]; if (!b) return;
+  if (!(b.vehicles && b.vehicles.length)) {
+    const cur = [], prop = [];
+    state.files.schedule.filter(f => f.status === 'ok').forEach(f => cur.push(...parseVehiclesFrontline(f.text), ...parseVehiclesBryte(f.text)));
+    state.files.quote.filter(f => f.status === 'ok').forEach(f => prop.push(...parseVehiclesBryte(f.text), ...parseVehiclesFrontline(f.text)));
+    const map = new Map();
+    // TBA plates can't merge on registration — pair them by year+make so the
+    // same unregistered vehicle on schedule and quote becomes ONE row, while
+    // two genuinely different TBA vehicles stay separate.
+    const tbaKey = v => 'tba:' + (v.desc || '').toUpperCase().split(/\s+/).slice(0, 2).join('');
+    cur.forEach((v, i) => {
+      const k = (v.reg && v.reg !== 'TBA') ? v.reg.toUpperCase() : i + tbaKey(v);
+      if (!map.has(k)) map.set(k, { id: uid(), reg: v.reg, desc: v.desc, value: v.value });
+    });
+    prop.forEach(v => {
+      if (v.reg && v.reg !== 'TBA') {
+        const k = v.reg.toUpperCase(), e = map.get(k);
+        if (!e) map.set(k, { id: uid(), reg: v.reg, desc: v.desc, value: v.value });
+        else { if (!e.desc) e.desc = v.desc; if (!e.value) e.value = v.value; }
+      } else {
+        const k = tbaKey(v);
+        const hit = [...map.entries()].find(([key, e]) => key.includes(k) && !e.__p);
+        if (hit) { const e = hit[1]; e.__p = 1; if (!e.desc) e.desc = v.desc; if (!e.value) e.value = v.value; }
+        else map.set('p' + map.size + k, { id: uid(), reg: v.reg, desc: v.desc, value: v.value });
+      }
+    });
+    if (map.size) b.vehicles = [...map.values()].map(v => { delete v.__p; return v; });
+  }
+  for (const q of state.quotes) {
+    const f = state.files.quote.find(x => x.id === q.srcId); if (!f || f.status !== 'ok') continue;
+    const tm = parseTermsBryte(f.text); if (!tm.tpl && !tm.pll && !tm.waiver) continue;
+    ensureTerms(b);
+    const put = (re, label, val) => {
+      if (val == null) return;
+      let t = b.terms.find(x => re.test(x.item || ''));
+      if (!t) { t = { id: uid(), item: label, current: '', props: {} }; b.terms.push(t); }
+      t.props = t.props || {}; if (!t.props[q.id]) t.props[q.id] = val;
+    };
+    put(/third party liability/i, 'Third Party Liability limit', tm.tpl);
+    put(/passenger liability/i, 'Passenger Liability limit', tm.pll);
+    put(/waiver/i, 'Excess waiver (basic first amount)', tm.waiver);
+  }
+  save();
 }
 
 function seedFromFiles() {
@@ -1645,6 +1805,9 @@ function seedFromFiles() {
     const curRows = [];
     for (const f of schedByB.get(b.id) || []) {
       const parsed = parseScheduleCur(f.text);
+      f.readNote = parsed.rows.length >= 2 ? { k: 'item' }
+        : parsed.total != null ? { k: 'total', why: 'summary table not recognised — only the total premium was read' }
+        : { k: 'none', why: 'no readable schedule layout found' };
       curRows.push(...parsed.rows);
       const bc = parsed.rows.find(r => /BUILDINGS/i.test(r.s) && r.si);
       if (bc && !b.si) b.si = fmtLimit(bc.si);
@@ -1676,6 +1839,9 @@ function seedFromFiles() {
     }
     const bld = bldExisting || matchBuilding(f.name + ' ' + (f.text || '')) || state.buildings[0];
     const prop = parseProposalProp(f.text);
+    f.readNote = prop.rows.length >= 2 ? { k: 'item' }
+      : prop.total != null ? { k: 'total', why: 'summary table not recognised — only the total premium was read' }
+      : { k: 'none', why: 'no readable quote layout found' };
     const q = existing || newQuote(bld.id, insurerFor(f), guessQuoteNo(f.text, f.name));
     q.optionId = optIdFor(f);
     q.lines = buildComparisonLines(bld.__curRows || [], prop);
@@ -1697,6 +1863,7 @@ function seedFromFiles() {
     genericSeed();
     return;
   }
+  seedVehiclesAndTerms();
   state.seeded = true; save();
 }
 
@@ -1828,7 +1995,7 @@ function screenUpload() {
     el('div', { class: 'note', style: 'margin-top:18px' }, el('span', { class: 'dot' }, '•'),
       el('span', {}, 'Local reading pulls the text out of each file so it is at hand on the Review step; buildings and quotes are pre-created from what is found. Insurer layouts vary — you confirm and correct every figure before anything is compared.')),
     el('div', { class: 'bar' }, el('div', { class: 'bar-in' },
-      el('button', { class: 'btn', onClick: () => { if (confirm('Clear this comparison and start over?')) { state = blank(); save(); render(); } } }, 'Reset'),
+      el('button', { class: 'btn', onClick: () => { if (confirm('Clear this comparison and start over?')) { state = blank(); clearDraft(); save(); render(); } } }, 'Reset'),
       el('div', { style: 'flex:1' }),
       el('span', { class: 'muted', style: 'font-size:12px' }, totalFiles + ' file' + (totalFiles===1?'':'s') + ' added'),
       el('button', { class: 'btn primary', disabled: !allRead, onClick: () => go('review') }, 'Continue to review →'),
@@ -1940,7 +2107,10 @@ const TERM_TEMPLATES = {
   general: ['Excess structure', 'Key cover limits', 'Notable terms / conditions', 'Exclusions to note'],
 };
 function policyKind() {
-  const t = [...state.files.schedule, ...state.files.quote].filter(f => f.status === 'ok').map(f => f.text || '').join(' ').toLowerCase();
+  let t = [...state.files.schedule, ...state.files.quote].filter(f => f.status === 'ok').map(f => f.text || '').join(' ').toLowerCase();
+  // Frontline-style summaries list every AVAILABLE section — "buildings
+  // combined  no  r0,00" is a section NOT taken, not a property signal.
+  t = t.replace(/(?:buildings combined|body corporate)\s+no\s+r?\s?0[.,]00/g, ' ');
   if (/\bfleet\b|number of vehicles|vehicle schedule|own damage|hijack|windscreen|\bregistration (?:number|no)\b/.test(t) && !/body corporate|buildings combined/.test(t)) return 'motor';
   if (/buildings combined|body corporate|sum insured|business interruption|office park/.test(t)) return 'property';
   return 'general';
@@ -2079,6 +2249,30 @@ function buildingCard(b, idx) {
     ),
   );
 }
+// Per-file read verdict badge + escalation. A layout the reader can't itemise
+// must be VISIBLE (the totals stay safe; the RM enters lines by hand) and one
+// tap away from becoming a sample Anne can teach the reader with.
+function readTag(f) {
+  const n = f.readNote; if (!n) return null;
+  const m = { item: ['ok', 'Itemised ✓'], total: ['warn', 'Total only'], none: ['err', 'Not read'] }[n.k];
+  return m ? el('span', { class: 'readtag ' + m[0], title: n.why || '' }, m[1]) : null;
+}
+function escalateBlock(okFiles) {
+  const unread = okFiles.filter(f => f.readNote && f.readNote.k !== 'item');
+  if (!unread.length) return null;
+  const rm = RMS.find(r => r.id === state.rmId);
+  const body = 'Hi Anne\n\nThe comparison tool could not itemise ' + (unread.length === 1 ? 'this document' : 'these documents') + ':\n\n'
+    + unread.map(f => '· ' + f.name + ' — ' + (f.readNote.why || 'not itemised')).join('\n')
+    + '\n\nClient: ' + (state.client.name || '—')
+    + '\nRM: ' + (rm ? rm.name : '—')
+    + '\n\nPLEASE ATTACH THE FILE(S) ABOVE TO THIS EMAIL BEFORE SENDING — then the reader can be taught this layout for everyone.\n';
+  const href = 'mailto:annekruger3010@gmail.com?subject=' + encodeURIComponent('Comparison tool could not itemise a schedule — ' + (state.client.name || 'client'))
+    + '&body=' + encodeURIComponent(body);
+  return el('div', { class: 'escalate' },
+    el('b', {}, unread.length === 1 ? '1 document didn’t itemise. ' : unread.length + ' documents didn’t itemise. '),
+    'The totals above are still safe to use — enter the line detail by hand. Then send the document to Anne so the reader learns this insurer’s layout for everyone (attach the file to the email).',
+    el('div', { style: 'margin-top:8px' }, el('a', { class: 'btn sm', href }, '✉ Email Anne')));
+}
 function screenReview() {
   const p = portfolio();
   const okFiles = [...state.files.schedule, ...state.files.quote].filter(f => f.status === 'ok');
@@ -2104,8 +2298,9 @@ function screenReview() {
     okFiles.length ? el('div', { style: 'margin-top:20px' },
       el('div', { class: 'eyebrow', style: 'margin-bottom:8px' }, 'Source documents (read on this device)'),
       okFiles.map(f => el('details', { class: 'src' },
-        el('summary', {}, f.name + ' — ' + (f.chars||0).toLocaleString() + ' chars'),
+        el('summary', {}, f.name + ' — ' + (f.chars||0).toLocaleString() + ' chars', readTag(f)),
         el('pre', {}, f.text || '(no text extracted)'))),
+      escalateBlock(okFiles),
     ) : null,
     el('div', { style: 'margin-top:20px' },
       state.buildings.map((b, i) => buildingCard(b, i))),
@@ -2823,7 +3018,8 @@ function screenReport() {
           'Prepared by Cartrack Insurance Agency (Pty) Ltd (FSP 17266) for ' + (state.client.name || 'the client') + '. Figures are captured from insurer schedules and quotations and are subject to the terms, conditions and exclusions of the underlying policy documents, which prevail over this summary. E&OE. This is a premium comparison and does not itself constitute advice or an offer of cover.',
           el('div', { class: 'cr-dctl' },
             el('span', {}, 'Confidential · Premium Comparison · ' + (state.client.name || '')),
-            el('span', {}, 'Prepared ' + today + ' · ' + rm.name))))),
+            el('span', {}, 'Prepared ' + today + ' · ' + rm.name + ' · ' + APP_VERSION))))),
+    el('div', { class: 'printhint no-print' }, 'Tip — iPhone: use the Share button → Options → PDF instead of Print (Print stamps the browser’s URL header on every page). Desktop Chrome: untick “Headers and footers” in the print dialog.'),
     el('div', { class: 'bar no-print' }, el('div', { class: 'bar-in' },
       el('button', { class: 'btn', onClick: () => go('review') }, '← Review'),
       el('div', { class: 'viewtog', role: 'group', 'aria-label': 'Report view' },
@@ -2876,11 +3072,26 @@ function screenWelcome(){
   return el('div',{class:'welcome'},
     el('div',{class:'wel-top'},
       el('div',{class:'b'}, 'CARTRACK ', el('span',{},'INSURANCE')),
+      el('span',{class:'appver', title:'App version — quote this to support'}, APP_VERSION),
       el('a',{class:'home-link', href:'https://cartrack-commercial.github.io/', title:'Back to the launcher'}, '← Home')),
     el('div',{class:'wel-body'},
       el('div',{class:'wel-kick'}, greetWord()+' — Commercial team'),
       el('h1',{class:'wel-h', html:'Who’s comparing <span class="accent">today?</span>'}),
       el('p',{class:'wel-sub'}, 'Tap your name to start a fresh comparison. Everything you load stays on this device only.'),
+      PENDING_DRAFT ? (() => {
+        const d = PENDING_DRAFT, n = d.state.files.schedule.length + d.state.files.quote.length;
+        const age = Math.max(1, Math.round((Date.now() - d.ts) / 6e4));
+        const when = age < 60 ? age + ' min ago' : age < 1440 ? Math.round(age / 60) + ' h ago' : Math.round(age / 1440) + ' d ago';
+        const rm = RMS.find(r => r.id === d.state.rmId);
+        return el('div', { class: 'draftbar' },
+          el('div', { class: 'dtxt' },
+            el('b', {}, 'Resume where you left off?'),
+            el('div', { class: 'ds' }, (d.state.client.name || 'Comparison in progress') + ' · ' + n + ' file' + (n === 1 ? '' : 's')
+              + (rm ? ' · ' + rm.name : '') + ' · saved ' + when + ' — stays on this device')),
+          el('div', { class: 'da' },
+            el('button', { class: 'btn primary sm', onClick: () => { state = d.state; PENDING_DRAFT = null; save(); render(); } }, 'Resume'),
+            el('button', { class: 'btn sm', onClick: () => { clearDraft(); render(); } }, 'Discard')));
+      })() : null,
       grid,
       el('div',{class:'wel-quote'},
         el('div',{class:'ql'}, 'Fuel for the day'),
